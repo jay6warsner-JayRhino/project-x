@@ -29,7 +29,7 @@
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <AndroidJavaSource Update="PlatformJava/**/*.java" Bind="false" />
     <AndroidMavenLibrary Include="com.alphacephei:vosk-android" Version="0.3.75" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
-    <AndroidMavenLibrary Include="net.java.dev.jna:jna" Version="5.18.1" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
+    <AndroidMavenLibrary Include="net.java.dev.jna:jna" Version="5.18.1" ArtifactFilename="jna-5.18.1.aar" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
     <AndroidMavenLibrary Include="com.google.ai.edge.litertlm:litertlm-android" Version="0.18.0" Repository="Google" Bind="false" />
     <AndroidMavenLibrary Include="com.google.code.gson:gson" Version="2.14.0" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
     <AndroidMavenLibrary Include="com.google.errorprone:error_prone_annotations" Version="2.48.0" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
