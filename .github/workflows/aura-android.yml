@@ -37,10 +37,10 @@ jobs:
       - name: Install Android dependencies
         run: dotnet build AuraOne/AuraOne.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSdkLicenses=True -v:minimal
       - name: Compile release APK
-        run: dotnet publish AuraOne/AuraOne.csproj -c Release -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME"
+        run: dotnet publish AuraOne/AuraOne.csproj -c Release -r android-arm64 -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME"
       - uses: actions/upload-artifact@v4
         with:
           name: aura-one-ci-apk
-          path: AuraOne/bin/Release/net10.0-android/*.apk
+          path: AuraOne/bin/Release/net10.0-android/**/*.apk
           if-no-files-found: error
           retention-days: 7
