@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      AURA_ANDROID_SDK: ${{ runner.temp }}/aura-android-sdk
+      AURA_ANDROID_SDK: /tmp/aura-android-sdk
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
