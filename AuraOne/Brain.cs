@@ -24,6 +24,7 @@ public sealed class Brain
     public bool WakeWord { get; set; }
     public bool Captions { get; set; }
     public bool Deep { get; set; }
+    public bool CompanionFace { get; set; }
     public bool SpeakReminders { get; set; } = true;
     public List<string> Memories { get; set; } = [];
     public List<string> Notes { get; set; } = [];
@@ -31,7 +32,7 @@ public sealed class Brain
     public List<Skill> Skills { get; set; } = [];
     public List<string> Roles { get; set; } = [];
     public List<Turn> History { get; set; } = [];
-    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
+    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["documents"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
     public bool Enabled(string tool) => Tools.TryGetValue(tool, out var enabled) && enabled;
     public string[] EnabledTools() => Tools.Where(x => x.Value).Select(x => x.Key).ToArray();
     public void Record(Turn turn) { History.Insert(0, turn); if (History.Count > 500) History.RemoveRange(500, History.Count - 500); }

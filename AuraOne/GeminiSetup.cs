@@ -17,6 +17,7 @@ public static class GeminiSetup
         if(b.Enabled("time"))Tool("get_time","Get the current date, time and timezone on the phone.",new());
         if(b.Enabled("wikipedia"))Tool("encyclopedia_search","Look up and read an encyclopedia topic.",new(){["query"]=String()},"query");
         if(b.Enabled("device"))Tool("device_action","Perform an approved native Android operation. Changes require an on-phone Allow once confirmation. Accessibility, notification access and Shizuku require the user to enable their permissions. value is a string: volume 0-100, brightness 10-255, timer minutes 1-240, alarm HH:MM, tap_percent x,y 0-100, flashlight on/off/toggle, or app/label/destination text.",new(){["action"]=String(DeviceActions.All),["value"]=String()},"action");
+        if(b.Enabled("documents"))Tool("document_page","See a specific page from the PDF the user selected and approved sharing. This cannot open arbitrary documents. Page numbers start at 1.",new(){["page"]=new{type="INTEGER"}},"page");
         if(b.Enabled("gmail"))Tool("gmail_search","Search this user-authorized Gmail account for message IDs; requires an authorized read-only Google token.",new(){["query"]=String()},"query");
         if(b.Enabled("gmail"))Tool("gmail_message","Read metadata for a Gmail message returned by gmail_search.",new(){["messageId"]=String()},"messageId");
         if(b.Enabled("calendar"))Tool("calendar_upcoming","Read upcoming events in the authorized Google Calendar.",new());

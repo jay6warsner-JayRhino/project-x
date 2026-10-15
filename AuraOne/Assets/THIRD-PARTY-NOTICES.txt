@@ -1,0 +1,43 @@
+Aura One 1.3 third-party components
+
+Vosk Android 0.3.75, the unmodified vosk-model-small-en-us-0.15 English model
+and Vosk's example test.wav are from Alpha Cephei / Vosk contributors.
+https://github.com/alphacep/vosk-api
+https://alphacephei.com/vosk/models
+Apache License 2.0; included in licenses/Vosk-Apache-2.0.txt.
+Bundled model ZIP SHA-256:
+30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498
+The model and audio are included unchanged. Aura integration code is separate.
+
+PdfPig 0.1.16, UglyToad / PdfPig contributors.
+https://github.com/UglyToad/PdfPig
+The upstream license is included as licenses/PdfPig-LICENSE.txt.
+
+Google AI Edge LiteRT-LM Android 0.18.0, Google and contributors.
+https://github.com/google-ai-edge/LiteRT-LM
+Apache License 2.0. No language model is bundled with this runtime.
+
+Java Native Access 5.18.1, JNA contributors.
+https://github.com/java-native-access/jna
+Dual Apache License 2.0 / LGPL 2.1 or later; used under Apache License 2.0.
+
+Gson, Kotlin, Kotlin coroutines, Error Prone annotations, AndroidX annotations,
+JetBrains annotations and Shizuku are used under their Apache License 2.0 terms.
+https://github.com/google/gson
+https://github.com/JetBrains/kotlin
+https://github.com/Kotlin/kotlinx.coroutines
+https://github.com/google/error-prone
+https://github.com/androidx/androidx
+https://github.com/JetBrains/java-annotations
+https://github.com/RikkaApps/Shizuku-API
+The complete Apache License 2.0 text is included in licenses/Vosk-Apache-2.0.txt.
+Upstream copyright and license metadata also remain in dependency packages.
+
+Optional Qwen3 0.6B download is separate from the APK and supplied by the
+LiteRT Community conversion of Alibaba Qwen3, under Apache License 2.0.
+https://huggingface.co/litert-community/Qwen3-0.6B
+https://huggingface.co/Qwen/Qwen3-0.6B
+It is a local alternative to cloud AI, not offline Gemini.
+
+Android platform and Microsoft .NET Android runtime components retain their
+upstream notices/licenses. Their inclusion does not imply endorsement.

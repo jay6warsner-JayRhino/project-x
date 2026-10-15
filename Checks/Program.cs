@@ -24,7 +24,7 @@ using(var setup=JsonDocument.Parse(JsonSerializer.Serialize(GeminiSetup.Build(ne
 Check(Brain.Import(Brain.Export(new Brain{SpeakReminders=false})).SpeakReminders==false,"spoken reminder preference backup");
 await ProtocolChecks.Run(Check);
 await AccountChecks.Run(Check);
-Console.WriteLine($"{passed} data and protocol checks passed.");
+await ModernChecks.Run(Check);Console.WriteLine($"{passed} data and protocol checks passed.");
 if(!args.Contains("--network"))return;
 using var http=new HttpClient{Timeout=TimeSpan.FromSeconds(40)};
 try{using var response=await http.PostAsJsonAsync("https://aura-your-pal.lovable.app/api/assistant",new{messages=new[]{new{role="user",content="Reply with exactly: Gemini connection ready."}},profile=new{persona="You are a voice-only personal assistant."},enabledTools=Array.Empty<string>()});Console.WriteLine("Assistant HTTP "+(int)response.StatusCode+" "+await response.Content.ReadAsStringAsync());}catch(Exception e){Console.WriteLine("Assistant ERROR "+e.Message);}

@@ -52,6 +52,15 @@ def assert_text(text, name):
         raise AssertionError('Missing text: ' + text)
     print('PASS ' + name, flush=True)
 
+def wait_text(text, name, seconds=90):
+    deadline=time.monotonic()+seconds
+    while time.monotonic()<deadline:
+        if any(text in node.get('text','') for node in dump(name).iter('node')):
+            print('PASS ' + name,flush=True)
+            return
+        time.sleep(2)
+    raise AssertionError('Timed out waiting for '+text)
+
 def screenshot(name):
     with (OUTPUT / (name + '.png')).open('wb') as out:
         subprocess.run(['adb', '-s', SERIAL, 'exec-out', 'screencap', '-p'], stdout=out, check=True, timeout=20)
@@ -76,7 +85,18 @@ try:
     assert_text('Secure storage check passed.', 'keystore-self-test')
     click('OK')
     screenshot('native-diagnostics')
+    click('Check PDF reader', scroll=True)
+    wait_text('PDF reader check passed.', 'pdf-text-and-native-render')
+    click('OK')
+    click('Tools')
+    click('Offline voice and wake setup', scroll=True)
+    click('Check offline speech engine', scroll=True)
+    wait_text('Offline speech engine check passed.', 'offline-vosk-jni-and-recognition')
+    click('OK')
+    screenshot('offline-setup')
+    click('Tools')
     click('Account authorization', scroll=True)
+    assert_text('Connect Google account','google-consent-entry')
     click('GitHub access token', scroll=True)
     adb('shell', 'input', 'text', 'aura-smoke-dummy-token')
     entered=dump('dummy-token-entered')
@@ -103,7 +123,7 @@ try:
     click('Disconnect GitHub from Aura', scroll=True)
     click('GitHub', scroll=True)
     assert_text('GitHub not authorized', 'account-disconnect')
-    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService']:
+    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService', 'AuraWakeService']:
         resolved=adb('shell','cmd','package','query-services','--brief','--components','-n',PACKAGE+'/'+PACKAGE+'.bridge.'+service)
         if service not in resolved:
             raise AssertionError('Native service missing: ' + service)
