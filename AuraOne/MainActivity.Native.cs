@@ -141,6 +141,7 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
         Add(page,Text("Camera permission: "+CheckSelfPermission(Manifest.Permission.Camera)));
         try{using var state=JsonDocument.Parse(NativeDeviceTools.Status());foreach(var p in state.RootElement.EnumerateObject())Add(page,Text(p.Name+": "+p.Value.ToString()));}catch{Add(page,Text("Native device status unavailable."));}
         Add(page,Btn("Check Gemini Live setup",()=>_=Check()),D(44));
+        Add(page,Btn("Check secure storage",()=>Error(KeyVault.Verify(this)?"Secure storage check passed.":"Secure storage check failed. No real credential was used.")),D(44));
         Add(page,Btn("Account authorization",()=>{tab="Accounts";Render();}),D(44));
     }
     protected override void OnNewIntent(Intent? intent)

@@ -10,6 +10,8 @@ public sealed class NativeAccounts(Context context):IAccountAccessTokenProvider
     {
         if(credential.UsableToken(DateTimeOffset.Now)==null)throw new InvalidOperationException("Enter a valid, unexpired access token.");
         KeyVault.Save(context,JsonSerializer.Serialize(credential),Slot(provider));
+        if(Load(provider)?.UsableToken(DateTimeOffset.Now)!=credential.UsableToken(DateTimeOffset.Now))
+        {Disconnect(provider);throw new InvalidOperationException("Secure account storage verification failed. Authorization was not retained.");}
     }
     public void Disconnect(AccountProvider provider)=>KeyVault.Save(context,"",Slot(provider));
     public bool Authorized(AccountProvider provider)=>Load(provider)?.UsableToken(DateTimeOffset.Now)!=null;

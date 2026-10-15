@@ -27,4 +27,10 @@ public static class KeyVault
     {
         try{using var preferences=context.GetSharedPreferences("private-keys",FileCreationMode.Private)!;var value=preferences.GetString(slot,null);if(value==null)return "";var parts=value.Split(':');using var cipher=Cipher.GetInstance("AES/GCM/NoPadding")!;cipher.Init(CipherMode.DecryptMode,Key(),new GCMParameterSpec(128,Convert.FromBase64String(parts[0])));return System.Text.Encoding.UTF8.GetString(cipher.DoFinal(Convert.FromBase64String(parts[1]))!);}catch{return "";}
     }
+    public static bool Verify(Context context)
+    {
+        const string slot="storage-diagnostic";var value=Guid.NewGuid().ToString("N");
+        try{Save(context,value,slot);return Load(context,slot)==value;}
+        finally{Save(context,"",slot);}
+    }
 }

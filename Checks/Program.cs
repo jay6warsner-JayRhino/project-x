@@ -2,6 +2,7 @@ using AuraOne;
 using System.Net.WebSockets;
 using System.Text.Json;
 using System.Net.Http.Json;
+if(args.Contains("--github-live")){await LiveAccountProbe.Run();return;}
 int passed=0;
 void Check(bool result,string name){if(!result)throw new Exception(name);Console.WriteLine("PASS "+name);passed++;}
 var brain=Brain.Import("""{"mybaby.brain.v1":{"persona":"British helper","memories":["Coffee"],"notes":["Call Alex"],"skills":[{"name":"Morning","trigger":"good morning","steps":"Read weather"}],"reminders":[{"text":"Plan","at":"2030-10-16T12:00:00+02:00"}]},"mybaby.settings.v1":{"tools":{"web":false},"language":"en-ZA","voiceRate":1.2},"mybaby.history.v1":[{"you":"old","baby":"old reply","at":"2026-10-12T08:00:00Z"},{"you":"new","baby":"new reply","at":"2026-10-14T08:00:00Z"}]}""");
