@@ -189,7 +189,7 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
     public void OnPartialResults(Bundle? results){}
     async Task Ask(string text,string? attachment=null,string? historyLabel=null)
     {
-        if(busy)return;if(OfflineCommands.DocumentPage(text) is {} pageNumber&&attachment==null){try{await SharePdfPage(pageNumber);}catch(Exception e){Error(e.Message);}return;}busy=true;recognizer?.Cancel();NativeLocal.Pause();Status("Thinking…");asking=new CancellationTokenSource();
+        if(busy)return;if(offlineVoice&&attachment!=null){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");ScheduleListen();return;}if(OfflineCommands.DocumentPage(text) is {} pageNumber&&attachment==null){try{await SharePdfPage(pageNumber);}catch(Exception e){Error(e.Message);}return;}busy=true;recognizer?.Cancel();NativeLocal.Pause();Status("Thinking…");asking=new CancellationTokenSource();
         try{var reply=await OfflineAction(text,asking.Token)??Local(text);if(reply==null&&offlineVoice)reply=await NativeLocal.Generate(this,OfflinePrompt(text),asking.Token);if(reply==null){var answer=brain.UseRelay?await assistant.Ask(brain,text,attachment??(frame.Length==0?null:frame),asking.Token):(await DirectGeminiClient.Ask(brain,text,attachment??(frame.Length==0?null:frame),KeyVault.Load(this),(name,args)=>ExecuteTool(name,args,asking.Token),asking.Token),Array.Empty<JsonElement>());reply=answer.Item1;foreach(var action in answer.Item2)if(brain.Apply(action,out var r)&&r!=null)Notifications(()=>ReminderReceiver.Schedule(this,r));}brain.Record(new Turn{You=historyLabel??text,Reply=reply,Mode=offlineVoice?"Offline":"Assistant"});Save();Status("Ready.");Speak(reply);}
         catch(System.OperationCanceledException){Status("Stopped.");}catch(Exception e){Error(e.Message);}finally{busy=false;asking?.Dispose();asking=null;if(brain.WakeWord)awake=false;if(!speaking)ScheduleListen();}
     }
@@ -308,8 +308,8 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
         return response;
     }
     void FlushLive(){if(liveUser.Length>0||liveReply.Length>0){brain.Record(new Turn{You=liveUser,Reply=liveReply,Mode="Live"});Save();}liveUser=liveReply="";}
-    void ToggleCamera(){if(source=="camera"){StopVision();Render();return;}Permission(Manifest.Permission.Camera,()=>{StopVision();camera=new CameraFrames(this,f=>OnFrame("camera",f));source="camera";tab="Home";Render();});}
-    void ToggleScreen(){if(source=="screen"){StopVision();Render();return;}Permission(Manifest.Permission.RecordAudio,()=>{var manager=(MediaProjectionManager)GetSystemService(MediaProjectionService)!;StartActivityForResult(manager.CreateScreenCaptureIntent(),100);});}
+    void ToggleCamera(){if(source=="camera"){StopVision();Render();return;}if(offlineVoice){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");return;}Permission(Manifest.Permission.Camera,()=>{StopVision();camera=new CameraFrames(this,f=>OnFrame("camera",f));source="camera";tab="Home";Render();});}
+    void ToggleScreen(){if(source=="screen"){StopVision();Render();return;}if(offlineVoice){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");return;}Permission(Manifest.Permission.RecordAudio,()=>{var manager=(MediaProjectionManager)GetSystemService(MediaProjectionService)!;StartActivityForResult(manager.CreateScreenCaptureIntent(),100);});}
     void StopVision(){camera?.Close();camera=null;StopService(new Intent(this,typeof(CaptureService)));source=frame="";}
     void OnFrame(string kind,string value){if(kind!=source||disposed)return;frame=value;live?.SendFrame(value);}
     void OnCaptureEnded()=>RunOnUiThread(()=>{if(source=="screen"){source=frame="";Status("Screen sharing ended.");}});
