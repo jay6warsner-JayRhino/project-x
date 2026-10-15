@@ -22,7 +22,7 @@ dotnet publish AuraOne/AuraOne.csproj -c Release -p:AndroidSdkDirectory="YOUR_SD
 
 The local Windows SDK/JDK defaults apply only when those directories exist. Other build machines can pass their own paths. Sign the resulting APK with your own Android release key. An APK signed with a different key cannot update the separately delivered preview in place.
 
-The prepared GitHub workflow runs 34 data/protocol checks and compiles Android packages without any provider API key or Lovable credits. It has not run on GitHub: the connected integration returned HTTP 403 when creating a branch. Build artifacts would use the runner's generated signing key, not the dedicated key used for the delivered APK.
+The GitHub workflow runs 34 data/protocol checks and compiles Android packages without any provider API key or Lovable credits. The source branch was uploaded using existing Git credentials after the connected integration returned HTTP 403. GitHub Actions has started; consult the Actions tab for its current result. Build artifacts would use the runner's generated signing key, not the dedicated key used for the delivered APK.
 
 ## Included
 

@@ -22,6 +22,8 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      AURA_ANDROID_SDK: ${{ runner.temp }}/aura-android-sdk
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -32,10 +34,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: dotnet workload install android --skip-manifest-update
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install Android dependencies
+        run: dotnet build AuraOne/AuraOne.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSdkLicenses=True -v:minimal
       - name: Compile release APK
-        run: dotnet publish AuraOne/AuraOne.csproj -c Release -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME"
+        run: dotnet publish AuraOne/AuraOne.csproj -c Release -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME"
       - uses: actions/upload-artifact@v4
         with:
           name: aura-one-ci-apk
