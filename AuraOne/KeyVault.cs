@@ -1,4 +1,5 @@
 using Android.Content;
+using Android.Runtime;
 using Android.Security.Keystore;
 using Java.Security;
 using Javax.Crypto;
@@ -10,7 +11,7 @@ public static class KeyVault
     static ISecretKey Key()
     {
         using var store=KeyStore.GetInstance("AndroidKeyStore")!;store.Load(null);
-        if(store.ContainsAlias(Alias))return (ISecretKey)store.GetKey(Alias,null)!;
+        if(store.ContainsAlias(Alias))return store.GetKey(Alias,null)!.JavaCast<ISecretKey>()!;
         using var generator=KeyGenerator.GetInstance(KeyProperties.KeyAlgorithmAes,"AndroidKeyStore")!;
         generator.Init(new KeyGenParameterSpec.Builder(Alias,KeyStorePurpose.Encrypt|KeyStorePurpose.Decrypt).SetBlockModes(KeyProperties.BlockModeGcm).SetEncryptionPaddings(KeyProperties.EncryptionPaddingNone).Build());
         return generator.GenerateKey()!;
