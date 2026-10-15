@@ -1,0 +1,42 @@
+{
+  "status": "registration_required",
+  "checked_on": "2026-10-15",
+  "android": {
+    "application_id": "za.co.auraone.assistant",
+    "version_name": "1.2",
+    "version_code": 3,
+    "release_certificate_sha1": "A8:49:F7:A3:D3:C8:43:69:18:F8:8A:0A:81:DD:5A:42:BA:69:3F:7D",
+    "release_certificate_sha256": "AB:9D:11:97:38:FA:5E:36:0D:0D:6B:75:89:BB:29:61:AB:8D:8E:C5:03:8E:21:08:B0:9C:87:2C:AA:7A:C1:FE"
+  },
+  "google": {
+    "android_oauth_client_id": null,
+    "web_oauth_client_id": null,
+    "authorized_redirect_uris": [],
+    "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+    "token_endpoint": "https://oauth2.googleapis.com/token",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/drive.metadata.readonly"
+    ]
+  },
+  "github": {
+    "oauth_client_id": null,
+    "authorized_callback_url": null,
+    "device_flow_enabled": null,
+    "device_authorization_endpoint": "https://github.com/login/device/code",
+    "token_endpoint": "https://github.com/login/oauth/access_token"
+  },
+  "token_broker": {
+    "public_base_url": null,
+    "deployed": false
+  },
+  "notes": [
+    "Null is a missing value, not a usable OAuth setting. No client ID or callback has been fabricated.",
+    "Provider authorization/token endpoints above are public provider endpoints, not an Aura One token broker.",
+    "Connected Lovable accounts and local Git credentials are not an OAuth registration for this APK.",
+    "No callable Google Cloud OAuth registration or GitHub OAuth application registration capability is available in this session.",
+    "Do not deploy new backend resources into baby-28d6e; the supplied sources explicitly exclude it.",
+    "Direct Gemini voice uses the owner key and needs neither OAuth account clients nor a token broker."
+  ]
+}
