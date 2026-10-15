@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">AuraOne</string>
     <string name="app_text">Hello, Android!</string>
+  <string name="baby_accessibility_description">Allows Aura One to navigate and tap controls only for approved device requests. No passive screen text collection.</string>
 </resources>

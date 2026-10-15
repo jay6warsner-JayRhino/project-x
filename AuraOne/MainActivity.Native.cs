@@ -13,12 +13,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Color = Android.Graphics.Color;
 using OperationCanceledException = System.OperationCanceledException;
+using AuraOne.Integrations;
 namespace AuraOne;
 
-[Activity(Label="Aura One", MainLauncher=true, Exported=true, Theme="@android:style/Theme.Material.NoActionBar", ConfigurationChanges=ConfigChanges.Orientation|ConfigChanges.ScreenSize)]
+[Activity(Name="za.co.auraone.assistant.MainActivity", LaunchMode=LaunchMode.SingleTop, Label="Aura One", MainLauncher=true, Exported=true, Theme="@android:style/Theme.Material.NoActionBar", ConfigurationChanges=ConfigChanges.Orientation|ConfigChanges.ScreenSize)]
 public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.IOnInitListener
 {
-    BrainStore store=null!; Brain brain=null!; LinearLayout page=null!; TextView? status; OrbView? orb;
+    BrainStore store=null!; Brain brain=null!; NativeAccounts accounts=null!; LinearLayout page=null!; TextView? status; OrbView? orb;
     readonly AssistantClient assistant=new(); readonly Handler handler=new(Looper.MainLooper!);
     SpeechRecognizer? recognizer; TextToSpeech? tts; GeminiLive? live; CameraFrames? camera;
     CancellationTokenSource? asking; Action? permissionAction; Task audioStopped=Task.CompletedTask;
@@ -27,10 +28,10 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
     int D(float n)=>(int)(Resources!.DisplayMetrics!.Density*n+.5f);
     protected override void OnCreate(Bundle? state)
     {
-        base.OnCreate(state); store=new BrainStore(FilesDir!.AbsolutePath); brain=store.Load(); tts=new TextToSpeech(this,this);
+        base.OnCreate(state); store=new BrainStore(FilesDir!.AbsolutePath); brain=store.Load(); accounts=new NativeAccounts(this); tts=new TextToSpeech(this,this);
         Window!.SetSoftInputMode(SoftInput.AdjustResize);
         if(SpeechRecognizer.IsRecognitionAvailable(this)){recognizer=SpeechRecognizer.CreateSpeechRecognizer(this);recognizer.SetRecognitionListener(this);}
-        LiveService.StopRequested+=OnLiveStopRequested; ReminderReceiver.Delivered+=OnReminderDelivered;CaptureService.Frame+=OnFrame; CaptureService.Ended+=OnCaptureEnded; ReminderReceiver.Reschedule(this,brain); Render();
+        LiveService.StopRequested+=OnLiveStopRequested; ReminderReceiver.Delivered+=OnReminderDelivered;CaptureService.Frame+=OnFrame; CaptureService.Ended+=OnCaptureEnded; ReminderReceiver.Reschedule(this,brain); Render();if(Intent?.GetBooleanExtra("aura_start_voice",false)==true)handler.PostDelayed(()=>{if(!disposed)ToggleLive();},700);
     }
     public void OnInit(OperationResult result){if(result==OperationResult.Success)Voice();}
     void Voice(){tts?.SetLanguage(Java.Util.Locale.ForLanguageTag(brain.Language));tts?.SetSpeechRate(brain.VoiceRate);tts?.SetPitch(brain.VoicePitch);}
@@ -51,7 +52,7 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
         var header=Row();Add(header,Text("AURA ONE",22,Accent),weight:true);Add(header,Btn("Settings",()=>{tab="Settings";Render();}),D(44),true);Add(root,header);
         var scroll=new ScrollView(this){FillViewport=true};page=Col();scroll.AddView(page);root.AddView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         var nav=Row();foreach(var name in new[]{"Home","Brain","Tools","History"}){var n=name;Add(nav,Btn(n,()=>{tab=n;Render();},tab==n),D(46),true);}Add(root,nav);SetContentView(root);
-        switch(tab){case "Home":Home();break;case "Brain":BrainPage();break;case "Tools":ToolsPage();break;case "History":HistoryPage();break;default:SettingsPage();break;}
+        switch(tab){case "Home":Home();break;case "Brain":BrainPage();break;case "Tools":ToolsPage();break;case "History":HistoryPage();break;case "Accounts":AccountsPage();break;case "Diagnostics":DiagnosticsPage();break;default:SettingsPage();break;}
     }
     void Home()
     {
@@ -80,8 +81,72 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
         Section("Tools & plugins","Choose what the assistant may use.");foreach(var (key,value) in brain.Tools.ToArray()){var k=key;Toggle(char.ToUpper(k[0])+k[1..],value,x=>brain.Tools[k]=x);}
         Section("Helper roles");foreach(var role in new[]{"tutor","coder","translator","coach","chef","shopper"}){var r=role;Toggle(char.ToUpper(r[0])+r[1..],brain.Roles.Contains(r),x=>{if(x&&!brain.Roles.Contains(r))brain.Roles.Add(r);if(!x)brain.Roles.Remove(r);});}
         Section("Phone & browser shortcuts");Add(page,Btn("Open dialler",()=>Open("tel:")),D(42));foreach(var name in new[]{"YouTube","Google","GitHub","Gmail","Calendar","Drive","Maps"}){var n=name;Add(page,Btn("Open "+n,()=>OpenShortcut(n.ToLowerInvariant())),D(42));}
-        Section("Account connectors","Accounts connected in Lovable belong to that workspace. This native build cannot use them until an authenticated account gateway is available. The buttons above open the installed apps or their websites.");
+        Section("Native device controls","Device changes use an Allow once confirmation. Enable Accessibility or Notification access only for the functions you want.");
+        Add(page,Btn("Set up Accessibility",()=>OpenNativeSettings(Android.Provider.Settings.ActionAccessibilitySettings)),D(44));
+        Add(page,Btn("Set up notification summaries",()=>OpenNativeSettings(Android.Provider.Settings.ActionNotificationListenerSettings)),D(44));
+        Add(page,Btn("Choose Aura One as assistant",ChooseAssistant),D(44));
+        foreach(var tool in new[]{("Battery","battery",""),("Device information","device_info",""),("Notification sources","notifications_summary",""),("Shizuku status","shizuku_status",""),("Request Shizuku permission","shizuku_permission",""),("Device action history","audit_log","")})
+        {var t=tool;Add(page,Btn(t.Item1,()=>_=RunDevice(t.Item2,t.Item3)),D(42));}
+        Add(page,Btn("Device controls",DevicePanel),D(44));
+        Section("Account tools","Optional read-only Gmail, Calendar, Drive and GitHub tools. Authorization belongs to this app; Lovable tokens do not automatically transfer.");
+        Add(page,Btn("Account authorization",()=>{tab="Accounts";Render();}),D(44));
+        Add(page,Btn("Connection and permissions status",()=>{tab="Diagnostics";Render();}),D(44));
         Section("Sources","Aura Your Pal: memory, notes, reminders, skills, history and research.\nAura Voice Connect: live voice, visual context, helper roles and plugins.\nJarvis chats: wake word, personality and device shortcuts.");
+    }
+    void OpenNativeSettings(string action)=>StartActivity(new Intent(action));
+    void ChooseAssistant()
+    {
+        if(OperatingSystem.IsAndroidVersionAtLeast(29))
+        {
+            var roles=(Android.App.Roles.RoleManager)GetSystemService(RoleService)!;
+            if(roles.IsRoleAvailable(Android.App.Roles.RoleManager.RoleAssistant)){StartActivityForResult(roles.CreateRequestRoleIntent(Android.App.Roles.RoleManager.RoleAssistant),105);return;}
+        }
+        OpenNativeSettings(Android.Provider.Settings.ActionManageDefaultAppsSettings);
+    }
+    async Task RunDevice(string action,string value="")
+    {
+        try{var result=await NativeDeviceTools.Run(this,action,value,CancellationToken.None);var text=JsonSerializer.SerializeToElement(result).GetProperty("result").GetString()??"";Status(text);Speak(text);}
+        catch(OperationCanceledException){Status("Device action stopped.");}
+        catch(Exception e){Error(e.Message);}
+    }
+    void DevicePanel()
+    {
+        var c=Col();c.SetPadding(D(18),0,D(18),0);
+        var actions=new Spinner(this);actions.Adapter=new ArrayAdapter<string>(this,Android.Resource.Layout.SimpleSpinnerDropDownItem,DeviceActions.All);
+        var value=Field("","Value, e.g. 50, on, 07:30, or button text");Add(c,actions);Add(c,value);
+        new AlertDialog.Builder(this)!.SetTitle("Native device controls")!.SetView(c)!.SetNegativeButton("Cancel",(_,_)=>{})!.SetPositiveButton("Request",(_,_)=>_=RunDevice(DeviceActions.All[actions.SelectedItemPosition],value.Text?.Trim()??""))!.Show();
+    }
+    void AccountsPage()
+    {
+        Section("Read-only account authorization","Accounts connected inside Lovable remain there. This independent APK needs its own user-authorized access token or OAuth registration. Credentials stay encrypted on this phone and never enter Gemini context or backups.");
+        Add(page,Text("Google: "+(accounts.Authorized(AccountProvider.Google)?"Authorization saved and unexpired":"No current authorization"),14,Accent));
+        Add(page,Text("Scopes: Gmail read-only, Calendar read-only and Drive metadata read-only. A pasted Google OAuth access token is temporary; automatic Google sign-in still needs the app's OAuth registration.",12,Subtle));
+        var google=Field("","Google OAuth access token");google.ContentDescription="Google OAuth access token";google.InputType=Android.Text.InputTypes.ClassText|Android.Text.InputTypes.TextVariationPassword;Add(page,google);
+        var lifetime=Field("60","Token validity in minutes");lifetime.InputType=Android.Text.InputTypes.ClassNumber;Add(page,lifetime);
+        Add(page,Btn("Save Google authorization",()=>{if(!int.TryParse(lifetime.Text,out var minutes)||minutes<1||minutes>1440){Error("Use a validity between 1 and 1,440 minutes.");return;}accounts.Save(AccountProvider.Google,new AccountCredential{AccessToken=google.Text?.Trim()??"",ExpiresAt=DateTimeOffset.Now.AddMinutes(minutes),Scope="gmail.readonly calendar.readonly drive.metadata.readonly"});brain.Tools["gmail"]=brain.Tools["calendar"]=brain.Tools["drive"]=true;Save();google.Text="";Render();}),D(44));
+        Add(page,Btn("Disconnect Google from Aura",()=>{accounts.Disconnect(AccountProvider.Google);foreach(var name in new[]{"gmail","calendar","drive"})brain.Tools[name]=false;Save();Render();}),D(42));
+        Section("GitHub",accounts.Authorized(AccountProvider.GitHub)?"GitHub authorization saved":"GitHub not authorized");
+        Add(page,Text("Use a user-authorized token with read permissions for the repositories and issues you want Aura to read. No GitHub write operations are exposed.",12,Subtle));
+        var github=Field("","GitHub access token");github.ContentDescription="GitHub access token";github.InputType=Android.Text.InputTypes.ClassText|Android.Text.InputTypes.TextVariationPassword;Add(page,github);
+        Add(page,Btn("Save GitHub authorization",()=>{accounts.Save(AccountProvider.GitHub,new AccountCredential{AccessToken=github.Text?.Trim()??"",Scope="read-only account adapter"});brain.Tools["github"]=true;Save();github.Text="";Render();}),D(44));
+        Add(page,Btn("Disconnect GitHub from Aura",()=>{accounts.Disconnect(AccountProvider.GitHub);brain.Tools["github"]=false;Save();Render();}),D(42));
+        Add(page,Text("Enable only the account tools you need in Tools. Private account reads are disabled in the optional public-relay mode. Token expiry or revocation is reported as an authorization error.",12,Subtle));
+    }
+    void DiagnosticsPage()
+    {
+        Section("Ready to talk");
+        Add(page,Text("Gemini key: "+(KeyVault.Load(this).Length>0?"Saved on this phone":"Required for direct voice")));
+        Add(page,Text("Connection: "+(live?.Connected==true?"Live voice connected":live!=null?"Connecting":"No active session")));
+        Add(page,Text("Microphone permission: "+CheckSelfPermission(Manifest.Permission.RecordAudio)));
+        Add(page,Text("Camera permission: "+CheckSelfPermission(Manifest.Permission.Camera)));
+        try{using var state=JsonDocument.Parse(NativeDeviceTools.Status());foreach(var p in state.RootElement.EnumerateObject())Add(page,Text(p.Name+": "+p.Value.ToString()));}catch{Add(page,Text("Native device status unavailable."));}
+        Add(page,Btn("Check Gemini Live setup",()=>_=Check()),D(44));
+        Add(page,Btn("Account authorization",()=>{tab="Accounts";Render();}),D(44));
+    }
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        if(intent?.GetBooleanExtra("aura_start_voice",false)==true&&live==null)handler.PostDelayed(()=>{if(!disposed)ToggleLive();},300);
     }
     void HistoryPage()
     {
@@ -101,7 +166,7 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
         Add(page,Btn("Remove device key",()=>Confirm("Remove device key?","Direct voice will need a new key. You can choose the optional server relay in Connections.",()=>KeyVault.Save(this,""))),D(42));
         Section("Connections","Use the optional server relay only if it has a working Gemini key. Direct mode sends audio and requests to Google using the encrypted device key.");Toggle("Use optional server relay",brain.UseRelay,x=>brain.UseRelay=x);var url=Field(brain.AssistantUrl,"HTTPS assistant endpoint");var liveUrl=Field(brain.LiveUrl,"WSS live relay endpoint");Add(page,url);Add(page,liveUrl);
         Add(page,Btn("Save settings",()=>{if(!Uri.TryCreate(url.Text,UriKind.Absolute,out var u)||u.Scheme!="https"){Error("Use an HTTPS assistant URL.");return;}if(!string.IsNullOrWhiteSpace(liveUrl.Text)&&(!Uri.TryCreate(liveUrl.Text,UriKind.Absolute,out var l)||l.Scheme!="wss")){Error("Use a WSS live relay URL.");return;}brain.AssistantName=string.IsNullOrWhiteSpace(name.Text)?"Jarvis":name.Text.Trim();brain.UserName=user.Text??"";brain.Persona=persona.Text??"";brain.Instructions=instruction.Text??"";brain.HomeCity=city.Text??"";brain.Language=lang.Text??"en-GB";brain.VoiceRate=.5f+rate.Progress/50f;brain.VoicePitch=.5f+pitch.Progress/50f;brain.LiveVoice=options[voices.SelectedItemPosition];brain.AssistantUrl=url.Text!.Trim();brain.LiveUrl=liveUrl.Text?.Trim()??"";Save();Voice();tab="Home";Render();},true),D(48));
-        Add(page,Btn("Check Gemini Live connection",()=>_=Check()),D(44));Add(page,Text("Aura One 1.1 · Native Android\nAccount integrations and device-specific behaviour still need end-to-end validation.",12,Subtle));
+        Add(page,Btn("Check Gemini Live connection",()=>_=Check()),D(44));Add(page,Text("Aura One 1.2 · Native Android\nAccount integrations and device-specific behaviour still need end-to-end validation.",12,Subtle));
     }
     void NewReminder(){var c=Col();c.SetPadding(D(18),0,D(18),0);var text=Field("","Reminder");var at=Field(DateTimeOffset.Now.AddMinutes(5).ToString("yyyy-MM-dd HH:mm zzz"),"Date and time with offset");Add(c,text);Add(c,at);new AlertDialog.Builder(this)!.SetTitle("New reminder")!.SetView(c)!.SetNegativeButton("Cancel",(_,_)=>{})!.SetPositiveButton("Save",(_,_)=>{if(string.IsNullOrWhiteSpace(text.Text)||!DateTimeOffset.TryParse(at.Text,out var when)||when<=DateTimeOffset.Now){Error("Enter a reminder and a future date/time.");return;}var r=new Reminder{Text=text.Text.Trim(),At=when};brain.Reminders.Add(r);Save();Notifications(()=>ReminderReceiver.Schedule(this,r));Render();})!.Show();}
     void NewSkill(){var c=Col();c.SetPadding(D(18),0,D(18),0);var name=Field("","Routine name");var trigger=Field("","When I say…");var steps=Field("","Follow these steps",true);foreach(var f in new[]{name,trigger,steps})Add(c,f);new AlertDialog.Builder(this)!.SetTitle("Teach a routine")!.SetView(c)!.SetNegativeButton("Cancel",(_,_)=>{})!.SetPositiveButton("Save",(_,_)=>{if(new[]{name.Text,trigger.Text,steps.Text}.Any(string.IsNullOrWhiteSpace)){Error("Complete all three fields.");return;}brain.Skills.Add(new Skill{Name=name.Text!.Trim(),Trigger=trigger.Text!.Trim(),Steps=steps.Text!.Trim()});Save();Render();})!.Show();}
@@ -119,7 +184,7 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
     async Task Ask(string text,string? attachment=null)
     {
         if(busy)return;busy=true;recognizer?.Cancel();Status("Thinking…");asking=new CancellationTokenSource();
-        try{var reply=Local(text);if(reply==null){var answer=brain.UseRelay?await assistant.Ask(brain,text,attachment??(frame.Length==0?null:frame),asking.Token):(await DirectGeminiClient.Ask(brain,text,attachment??(frame.Length==0?null:frame),KeyVault.Load(this),ExecuteTool,asking.Token),Array.Empty<JsonElement>());reply=answer.Item1;foreach(var action in answer.Item2)if(brain.Apply(action,out var r)&&r!=null)Notifications(()=>ReminderReceiver.Schedule(this,r));}brain.Record(new Turn{You=text,Reply=reply});Save();Status("Ready.");Speak(reply);}
+        try{var reply=Local(text);if(reply==null){var answer=brain.UseRelay?await assistant.Ask(brain,text,attachment??(frame.Length==0?null:frame),asking.Token):(await DirectGeminiClient.Ask(brain,text,attachment??(frame.Length==0?null:frame),KeyVault.Load(this),(name,args)=>ExecuteTool(name,args,asking.Token),asking.Token),Array.Empty<JsonElement>());reply=answer.Item1;foreach(var action in answer.Item2)if(brain.Apply(action,out var r)&&r!=null)Notifications(()=>ReminderReceiver.Schedule(this,r));}brain.Record(new Turn{You=text,Reply=reply});Save();Status("Ready.");Speak(reply);}
         catch(System.OperationCanceledException){Status("Stopped.");}catch(Exception e){Error(e.Message);}finally{busy=false;asking?.Dispose();asking=null;if(brain.WakeWord)awake=false;if(!speaking)ScheduleListen();}
     }
     string? Local(string text)
@@ -180,7 +245,8 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
             if(content.TryGetProperty("inputTranscription",out var input)&&input.TryGetProperty("text",out var inputText)){if(liveReply.Length>0)FlushLive();liveUser+=inputText.GetString()??"";}
             if(content.TryGetProperty("outputTranscription",out var output)&&output.TryGetProperty("text",out var outputText))liveReply+=outputText.GetString()??"";
             if(content.TryGetProperty("interrupted",out var interrupted)&&interrupted.ValueKind==JsonValueKind.True)Status("Listening…");
-            if(content.TryGetProperty("turnComplete",out var complete)&&complete.ValueKind==JsonValueKind.True){FlushLive();Status("Gemini Live · Listening");}
+            if(content.TryGetProperty("turnComplete",out var complete)&&complete.ValueKind==JsonValueKind.True){if(!brain.Deep){FlushLive();Status("Gemini Live · Listening");}else Status("Gemini Live · Background reasoning");}
+            if(content.TryGetProperty("interactionStatus",out var interaction)){var state=interaction.GetString();if(state=="IDLE"){FlushLive();Status("Gemini Live · Listening");}else if(state=="IN_PROGRESS")Status("Gemini Live · Working");}
         }
         if(e.TryGetProperty("toolCall",out var toolCall)&&toolCall.TryGetProperty("functionCalls",out var calls))foreach(var call in calls.EnumerateArray())HandleGeminiTool(session,call);
     });
@@ -192,15 +258,34 @@ public sealed class MainActivity : Activity, IRecognitionListener, TextToSpeech.
         if(!call.TryGetProperty("name",out var toolName)||toolName.ValueKind!=JsonValueKind.String)return;
         var name=toolName.GetString()??"";
         if(!current.CanCompleteTool(id))return;
-        var response=await ExecuteTool(name,call.TryGetProperty("args",out var args)?args:JsonSerializer.SerializeToElement(new{}));
+        var response=await ExecuteTool(name,call.TryGetProperty("args",out var args)?args:JsonSerializer.SerializeToElement(new{}),current.Cancellation,()=>ReferenceEquals(live,current)&&current.CanCompleteTool(id));
         if(ReferenceEquals(live,current)&&current.CanCompleteTool(id))
             current.Send(new{toolResponse=new{functionResponses=new[]{new{id,name,response}}}});
     }
-    async Task<object> ExecuteTool(string name,JsonElement args)
+    async Task<object> ExecuteTool(string name,JsonElement args,CancellationToken cancellation=default,Func<bool>? stillAllowed=null)
     {
         object response;
         try{
-            if(name=="persist_action"){
+            cancellation.ThrowIfCancellationRequested();
+            if(name=="session_control"){
+                var action=args.TryGetProperty("action",out var command)?command.GetString():"";
+                switch(action){
+                    case "sleep":case "end":StopLive();StopVoice();StopVision();Speak("Standing by. Until next time.");Render();break;
+                    case "mute_microphone":muted=true;live?.SetMuted(true);recognizer?.Cancel();Render();break;
+                    case "stop_visuals":StopVision();Render();break;
+                    case "share_camera":if(!foreground)throw new InvalidOperationException("Return to Aura One to share the camera.");if(source!="camera")ToggleCamera();break;
+                    case "share_screen":if(!foreground)throw new InvalidOperationException("Return to Aura One to approve screen sharing.");if(source!="screen")ToggleScreen();break;
+                    default:throw new InvalidOperationException("Unknown session control.");
+                }response=new{requested=action};
+            }else if(name=="device_action"){
+                if(!brain.Enabled("device"))throw new InvalidOperationException("Device controls are disabled.");
+                var action=args.TryGetProperty("action",out var a)?a.GetString()??"":"";var value=args.TryGetProperty("value",out var v)?v.GetString()??"":"";
+                if(!DeviceActions.ReadOnly(action)&&!foreground)throw new InvalidOperationException("Return to Aura One to approve the device action.");
+                response=await NativeDeviceTools.Run(this,action,value,cancellation,stillAllowed);
+            }else if(name is "gmail_search" or "gmail_message" or "calendar_upcoming" or "drive_search" or "github_repositories" or "github_issues"){
+                if(brain.UseRelay)throw new InvalidOperationException("Account tools use direct Google mode to avoid the public relay.");
+                response=await accounts.Run(name,args,brain,cancellation);
+            }else if(name=="persist_action"){
                 var action=args.TryGetProperty("action",out var nested)&&nested.ValueKind==JsonValueKind.Object?nested:args;
                 var saved=brain.Apply(action,out var reminder);Save();if(reminder!=null)Notifications(()=>ReminderReceiver.Schedule(this,reminder));response=new{saved,notificationPermission=!OperatingSystem.IsAndroidVersionAtLeast(33)||CheckSelfPermission(Manifest.Permission.PostNotifications)==Android.Content.PM.Permission.Granted};
             }else if(name=="phone_action"){

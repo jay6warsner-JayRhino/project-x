@@ -19,6 +19,7 @@ public sealed class GeminiLive : IDisposable
     AudioManager? manager;Mode previousMode;AudioDeviceInfo? previousDevice;bool previousSpeaker;
     volatile bool closed,muted;int epoch;Task? stopping;
     public bool Connected=>!closed&&connection?.Connected==true;
+    public CancellationToken Cancellation=>life.Token;
     public GeminiLive(Context context,Brain brain,Action<JsonElement> onEvent){this.context=context;this.brain=brain;this.onEvent=onEvent;}
     public async Task Start()
     {

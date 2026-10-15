@@ -1,44 +1,36 @@
-# Aura One native Android assistant
+# Aura One native Android voice assistant
 
-Aura One combines the inspected Aura Your Pal and Aura Voice Connect features into a native Android app with spoken conversation. The default model is Gemini 3.8 Live. Android speech recognition plus Gemini 3.8 Flash and Android text-to-speech provide an optional fallback. Neither direct mode requires Lovable AI credits. Google API quota and billing still apply.
+Aura One combines the inspected Aura Your Pal and Aura Voice Connect projects with the supplied My Baby/Aura One sources in a native Android application. Spoken conversation defaults to Gemini 3.8 Live using the owner's device-stored Gemini key. Android speech recognition, Gemini 3.8 Flash and Android text-to-speech provide a fallback. Neither direct mode uses Lovable AI credits. Google API quota and billing still apply.
 
-This is version 1.1, an installable preview. A successful provider audio conversation and Samsung A56 hardware behavior remain unverified. Do not describe this as a complete Gemini consumer-app replacement.
+Version 1.2 is an installable preview. Real provider audio and Samsung A56 hardware behavior still need validation with the owner's key and phone. Complete equivalence to the Gemini consumer application is not claimed.
 
-## Use the APK
+## Install
 
-Install the signed APK delivered separately, open Settings, enter a Gemini API key on the phone and choose Save device key. Leave Use optional server relay off. Choose Check Gemini Live connection, then Home > Start Gemini Live and grant microphone permission.
+Install the separately delivered signed APK, open Settings, save a Gemini API key on the phone and leave optional server relay disabled. Check Gemini Live setup, then start voice and grant microphone permission. The conversational screen has no typed chat or captions; settings, history and saved data have native text controls.
 
-The key is encrypted with Android Keystore. It is excluded from JSON backups, source control and the distributed APK. Conversation controls are voice-only; settings and saved-data screens use native text controls.
-
-## Build and check locally
-
-Requirements: .NET SDK 10.0.401 or a later 10.0.4xx patch, the Android workload, Android SDK platform 36/build-tools 36.0.0 and JDK 21.
-
-```sh
-dotnet workload install android
-dotnet run --project Checks/Checks.csproj
-dotnet publish AuraOne/AuraOne.csproj -c Release -p:AndroidSdkDirectory="YOUR_SDK" -p:JavaSdkDirectory="YOUR_JDK_21"
-```
-
-The local Windows SDK/JDK defaults apply only when those directories exist. Other build machines can pass their own paths. Sign the resulting APK with your own Android release key. An APK signed with a different key cannot update the separately delivered preview in place.
-
-The GitHub workflow runs 34 data/protocol checks and compiles Android packages without any provider API key or Lovable credits. The source branch was uploaded using existing Git credentials after the connected integration returned HTTP 403. GitHub Actions has started; consult the Actions tab for its current result. Build artifacts would use the runner's generated signing key, not the dedicated key used for the delivered APK.
+Keys and account tokens are encrypted with Android Keystore and excluded from backups and this repository. Optional account adapters support read-only Gmail, Calendar, Drive metadata, GitHub repositories and issues after authorization in this APK. Lovable's connected accounts do not transfer credentials. Automatic renewable Google/GitHub sign-in still needs a registered OAuth client and authorized callback; the preview supports explicit temporary access-token entry.
 
 ## Included
 
-- Direct Gemini Live microphone audio, streamed spoken replies, interruption, mute and bounded session resumption.
-- Native camera and screen sharing, image/plain-text attachments.
-- Local memories, notes, reminders, learned routines, searchable history and JSON backup/import.
-- Personality, language, Gemini voices, helper roles and enabled tool settings.
-- Weather, time, arithmetic, encyclopedia lookup and Google Search grounding in primary Live mode.
-- App shortcuts and dialler preparation; Android recognition wake phrases while the app is visible.
+- Live microphone/audio playback, interruption, mute, bounded session resumption and voice session controls.
+- Native camera and screen sharing, selected image/plain-text attachments.
+- Local memory, notes, reminders, routines, roles, history and JSON migration/backup.
+- Weather, calculator, encyclopedia lookup, time and Google Search grounding in primary Live mode.
+- Forty fixed device operations, user-enabled Accessibility, notification source summaries, default-assistant service and optional Shizuku UserService integration. Device changes require Allow once.
+- Six account-reading tools with fixed HTTPS endpoints, bounded responses and safe authorization errors.
 
-## Open items
+The supplied WebView/Termux/server implementations were used as references. This APK uses native Android views and does not run a local Termux web server. Enterprise avatar integration, always-on hotword detection, arbitrary shell execution, PDF/Office parsing and offline Gemini inference are not implemented. The extra source chat ending 1c3a6ff8 remained inaccessible. Files only named in transcripts cannot be reconstructed without their contents.
 
-- The user's Google/GitHub connections in Lovable are not portable OAuth credentials. An authenticated account gateway is still needed before this APK can read Gmail, Calendar, Drive or GitHub account data.
-- The additional source chat ending 1c3a6ff8 could not be accessed; full coverage of its requirements cannot be claimed.
-- Physical A56 audio, Bluetooth, camera, sharing, reminder delivery and Samsung battery behavior need device validation.
-- Always-on background hotword detection, full phone automation, PDF/Office parsing and offline Gemini intelligence are not implemented.
-- The original public relay was observed accepting a WebSocket but timing out during provider setup. It remains optional and unverified. Keep private account data out of unauthenticated relay routes.
+## Build and check
 
-This export contains the generated native application and portable checks only. Original Lovable project snapshots, raw chat transcripts, personal backups, provider credentials and signing material are excluded.
+Use .NET SDK 10.0.401 (or compatible later 10.0.4xx patch), Android workload, Android SDK platform 36/build tools 36.0.0, and JDK 21.
+
+    dotnet workload install android
+    dotnet run --project Checks/Checks.csproj
+    dotnet publish AuraOne/AuraOne.csproj -c Release -p:AndroidSdkDirectory="YOUR_SDK" -p:JavaSdkDirectory="YOUR_JDK_21"
+
+The Windows SDK/JDK defaults apply only when those paths exist. Sign builds with your own release key. CI uses an ephemeral signing key and cannot update the separately delivered APK in place.
+
+GitHub Actions runs 54 data/protocol/account checks, builds ARM64 Android and runs an x86_64 Android emulator smoke test. The emulator test uses only a dummy credential, verifies encrypted credential persistence/removal and native bridge/service registration, and refuses physical phones. Provider audio is not tested without a real key.
+
+This public export contains generated native source and checks only. Original Lovable snapshots, supplied private chat transcripts/reference archives, personal backups, API keys and signing private keys are excluded.

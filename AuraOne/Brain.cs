@@ -31,7 +31,7 @@ public sealed class Brain
     public List<Skill> Skills { get; set; } = [];
     public List<string> Roles { get; set; } = [];
     public List<Turn> History { get; set; } = [];
-    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true };
+    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
     public bool Enabled(string tool) => Tools.TryGetValue(tool, out var enabled) && enabled;
     public string[] EnabledTools() => Tools.Where(x => x.Value).Select(x => x.Key).ToArray();
     public void Record(Turn turn) { History.Insert(0, turn); if (History.Count > 500) History.RemoveRange(500, History.Count - 500); }
@@ -61,6 +61,7 @@ public sealed class Brain
     static Brain Normalize(Brain b)
     {
         b.Memories??=[];b.Notes??=[];b.Reminders??=[];b.Skills??=[];b.Roles??=[];b.History??=[];b.Tools??=new Brain().Tools;
+        foreach(var pair in new Brain().Tools)if(!b.Tools.ContainsKey(pair.Key))b.Tools[pair.Key]=pair.Value;
         b.AssistantName=string.IsNullOrWhiteSpace(b.AssistantName)?"Jarvis":b.AssistantName;b.Persona??="";b.UserName??="";b.Instructions??="";b.Language??="en-GB";b.HomeCity??="Johannesburg";
         b.LiveVoice=GeminiVoices.All.Contains(b.LiveVoice)?b.LiveVoice:"Charon";b.VoiceRate=Math.Clamp(b.VoiceRate,.5f,2.5f);b.VoicePitch=Math.Clamp(b.VoicePitch,.5f,2.5f);
         if(!Uri.TryCreate(b.AssistantUrl,UriKind.Absolute,out var a)||a.Scheme!="https")throw new FormatException("The backup has an invalid assistant endpoint.");

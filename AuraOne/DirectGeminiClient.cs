@@ -17,7 +17,7 @@ public static class DirectGeminiClient
         var instruction=setup.GetProperty("systemInstruction").Clone();
         // Function calling stays separate from built-in search in this fallback.
         // Google Search grounding remains available in the primary Gemini Live session.
-        var tools=setup.GetProperty("tools").EnumerateArray().Where(t=>t.TryGetProperty("functionDeclarations",out _)).Select(t=>t.Clone()).ToArray();
+        var tools=setup.GetProperty("tools").EnumerateArray().Where(t=>t.TryGetProperty("functionDeclarations",out _)).Select(t=>(object)new{functionDeclarations=t.GetProperty("functionDeclarations").EnumerateArray().Select(d=>d.EnumerateObject().Where(p=>p.Name!="behavior").ToDictionary(p=>p.Name,p=>p.Value.Clone())).ToArray()}).ToArray();
         var contents=new List<object>();
         foreach(var turn in brain.History.Take(7).Reverse())
         {

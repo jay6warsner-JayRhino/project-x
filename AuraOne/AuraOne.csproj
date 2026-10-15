@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>za.co.auraone.assistant</ApplicationId>
-    <ApplicationVersion>2</ApplicationVersion>
-    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>1.2</ApplicationDisplayVersion>
     <!--
       Enables trim analyzers and full trimming during Release mode.
       To learn more, see: https://learn.microsoft.com/dotnet/core/deploying/trimming/trimming-options#trimming-granularity
@@ -25,4 +25,12 @@
     <JavaSdkDirectory Condition="Exists('C:\Program Files\Android\openjdk\jdk-21.0.8')">C:\Program Files\Android\openjdk\jdk-21.0.8</JavaSdkDirectory>
   </PropertyGroup>
   <ItemGroup><Compile Remove="MainActivity.cs;NativeLive.cs" /></ItemGroup>
+  <ItemGroup>
+    <AndroidJavaSource Update="PlatformJava/**/*.java" Bind="false" />
+    <AndroidMavenLibrary Include="dev.rikka.shizuku:api" Version="13.1.5" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
+    <AndroidMavenLibrary Include="dev.rikka.shizuku:provider" Version="13.1.5" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
+    <AndroidMavenLibrary Include="dev.rikka.shizuku:aidl" Version="13.1.5" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
+    <AndroidMavenLibrary Include="dev.rikka.shizuku:shared" Version="13.1.5" Repository="https://repo.maven.apache.org/maven2" Bind="false" />
+    <AndroidMavenLibrary Include="androidx.annotation:annotation" Version="1.3.0" Repository="Google" Bind="false" />
+  </ItemGroup>
 </Project>

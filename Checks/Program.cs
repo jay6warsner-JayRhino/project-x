@@ -17,11 +17,12 @@ using(var json=JsonDocument.Parse("""{"type":"reminder","text":"Too late","at":"
 Check(Calculator.Evaluate("2+3*4")=="14"&&Calculator.Evaluate("(2+3)*4")=="20","arithmetic precedence");
 for(var i=0;i<510;i++)brain.Record(new Turn{You="turn "+i,Reply="reply"});Check(brain.History.Count==500&&brain.History[0].You=="turn 509","bounded history");Check(brain.Search("TURN 509").Count()==1,"history search");
 using(var setup=JsonDocument.Parse(JsonSerializer.Serialize(GeminiSetup.Build(new Brain(),null),Brain.Json))){var value=setup.RootElement.GetProperty("setup");Check(value.GetProperty("model").GetString()=="models/gemini-3.8-live","default Gemini Live 3.8 model");Check(value.GetProperty("generationConfig").GetProperty("responseModalities")[0].GetString()=="AUDIO","audio-only Gemini replies");}
-var disabled=new Brain();foreach(var key in disabled.Tools.Keys.ToArray())disabled.Tools[key]=false;using(var setup=JsonDocument.Parse(JsonSerializer.Serialize(GeminiSetup.Build(disabled,null),Brain.Json)))Check(setup.RootElement.GetProperty("setup").GetProperty("tools").GetArrayLength()==0,"direct Gemini disabled tool declarations");
+var disabled=new Brain();foreach(var key in disabled.Tools.Keys.ToArray())disabled.Tools[key]=false;using(var setup=JsonDocument.Parse(JsonSerializer.Serialize(GeminiSetup.Build(disabled,null),Brain.Json)))Check(setup.RootElement.GetProperty("setup").GetProperty("tools").EnumerateArray().Where(t=>t.TryGetProperty("functionDeclarations",out _)).SelectMany(t=>t.GetProperty("functionDeclarations").EnumerateArray()).All(d=>d.GetProperty("name").GetString()=="session_control"),"disabled task tools retain only voice session controls");
 Check(!Brain.Export(new Brain()).Contains("apiKey",StringComparison.OrdinalIgnoreCase),"backup excludes provider key");
 using(var setup=JsonDocument.Parse(JsonSerializer.Serialize(GeminiSetup.Build(new Brain(),null),Brain.Json)))Check(setup.RootElement.GetProperty("setup").GetProperty("tools").EnumerateArray().Any(x=>x.TryGetProperty("googleSearch",out _)),"Google Search grounding enabled");
 Check(Brain.Import(Brain.Export(new Brain{SpeakReminders=false})).SpeakReminders==false,"spoken reminder preference backup");
 await ProtocolChecks.Run(Check);
+await AccountChecks.Run(Check);
 Console.WriteLine($"{passed} data and protocol checks passed.");
 if(!args.Contains("--network"))return;
 using var http=new HttpClient{Timeout=TimeSpan.FromSeconds(40)};
