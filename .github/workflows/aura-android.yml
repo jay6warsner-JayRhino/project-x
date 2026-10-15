@@ -52,6 +52,7 @@ jobs:
     env:
       AURA_ANDROID_SDK: /tmp/aura-android-sdk
       AURA_TEST_OUTPUT: android-smoke-output
+      ANDROID_AVD_HOME: /tmp/aura-android-avd
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -72,7 +73,8 @@ jobs:
           AURA_SDKMANAGER=$(find "$AURA_ANDROID_SDK" -name sdkmanager -type f -print -quit)
           "$AURA_SDKMANAGER" "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64"
           AURA_AVDMANAGER=$(find "$AURA_ANDROID_SDK" -name avdmanager -type f -print -quit)
-          echo no | "$AURA_AVDMANAGER" create avd -n aura_ci -k "system-images;android-35;google_apis;x86_64" --force
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$AURA_AVDMANAGER" create avd -n aura_ci -p "$ANDROID_AVD_HOME/aura_ci.avd" -k "system-images;android-35;google_apis;x86_64" --force
           sudo chmod 666 /dev/kvm
       - name: Run native smoke checks
         timeout-minutes: 10
@@ -82,6 +84,7 @@ jobs:
           export ANDROID_SDK_ROOT="$AURA_ANDROID_SDK"
           export PATH="$AURA_ANDROID_SDK/platform-tools:$PATH"
           mkdir -p android-smoke-output
+          "$AURA_ANDROID_SDK/emulator/emulator" -list-avds | tee android-smoke-output/available-avds.txt
           "$AURA_ANDROID_SDK/emulator/emulator" -avd aura_ci -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -memory 2048 -cores 2 > android-smoke-output/emulator.log 2>&1 &
           timeout 60 adb wait-for-device
           timeout 180 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
