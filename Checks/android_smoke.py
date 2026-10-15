@@ -103,10 +103,12 @@ try:
     click('Disconnect GitHub from Aura', scroll=True)
     click('GitHub', scroll=True)
     assert_text('GitHub not authorized', 'account-disconnect')
-    package = adb('shell', 'dumpsys', 'package', PACKAGE)
-    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService', 'ShizukuProvider']:
-        if service not in package:
+    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService']:
+        resolved=adb('shell','cmd','package','query-services','--brief','--components','-n',PACKAGE+'/'+PACKAGE+'.bridge.'+service)
+        if service not in resolved:
             raise AssertionError('Native service missing: ' + service)
+    if 'ShizukuProvider' not in adb('shell','dumpsys','package',PACKAGE):
+        raise AssertionError('Protected Shizuku provider missing')
     print('PASS native services registered', flush=True)
     logs = adb('logcat', '-d', '-s', 'AndroidRuntime:E')
     (OUTPUT / 'android-runtime.log').write_text(logs)
