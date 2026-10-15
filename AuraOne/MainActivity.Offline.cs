@@ -12,21 +12,27 @@ public sealed partial class MainActivity
  {
   if(disposed||!localPolling)return;
   try{string? raw;while((raw=NativeLocal.Poll())!=null){using var message=JsonDocument.Parse(raw);var type=message.RootElement.GetProperty("type").GetString();var text=message.RootElement.GetProperty("text").GetString()??"";
-   if(type=="speech"&&offlineVoice&&foreground&&listen&&!busy)_=Ask(text);
-   else if(type=="wake"&&foreground&&live==null&&!listen)ToggleLive();
+   if(type=="speech"&&offlineVoice&&foreground&&listen&&!busy&&!muted)_=Ask(text);
+   else if(type=="wake"&&foreground&&live==null&&!listen&&!muted)ToggleLive();
    else if(type=="ready")Status(offlineVoice?"Offline voice ready.":"Local wake word enabled.");
    else if(type=="error"){listen=offlineVoice=false;Error(text);}
   }}catch(Exception e){Status("Local voice: "+e.GetType().Name);}
   handler.PostDelayed(PollLocal,300);
  }
- void StartOfflineVoice()=>Permission(Manifest.Permission.RecordAudio,()=>{
-  backgroundWake=false;StopVoice();StopLive();offlineVoice=true;listen=awake=true;muted=false;NativeLocal.Start(this,"offline",brain.AssistantName);tab="Home";Render();
- });
- void StartBackgroundWake()=>Permission(Manifest.Permission.RecordAudio,()=>{
-  StopVoice();StopLive();brain.WakeWord=false;Save();backgroundWake=true;NativeLocal.Start(this,"wake",brain.AssistantName);Status("Local wake word starting.");
- });
+ void SetMuted(bool value){muted=value;live?.SetMuted(value);if(value){recognizer?.Cancel();NativeLocal.Pause();}else if(backgroundWake&&!listen&&live==null)NativeLocal.Resume();else ScheduleListen();}
+ void StartOfflineVoice()=>Permission(Manifest.Permission.RecordAudio,()=>_=StartLocalVoice(false));
+ void StartBackgroundWake()=>Permission(Manifest.Permission.RecordAudio,()=>_=StartLocalVoice(true));
+ async Task StartLocalVoice(bool wake)
+ {
+  try{backgroundWake=false;NativeLocal.Pause();StopVoice();StopLive();muted=false;
+   if(wake){brain.WakeWord=false;Save();backgroundWake=true;}else{offlineVoice=true;listen=awake=true;}
+   await audioStopped;if(disposed||(wake?!backgroundWake:!offlineVoice))return;
+   NativeLocal.Start(this,wake?"wake":"offline",brain.AssistantName);
+   if(wake)Status("Local wake word starting.");else{tab="Home";Render();}
+  }catch(Exception e){offlineVoice=listen=backgroundWake=false;Error("Local voice: "+e.Message);}
+ }
  async Task ResumeWake(Task stopped)
- {await stopped;if(backgroundWake&&live==null&&!listen)RunOnUiThread(()=>NativeLocal.Resume());}
+ {await stopped;if(backgroundWake&&live==null&&!listen&&!muted)RunOnUiThread(()=>NativeLocal.Resume());}
  void OfflinePage()
  {
   Section("Offline voice and wake word","Local English speech recognition is included in the APK. Gemini Live remains the default. Local commands and an optional downloaded language model can work without cloud AI credits.");

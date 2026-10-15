@@ -26,7 +26,7 @@ public static class DocumentReader
    using var archive=new ZipArchive(new MemoryStream(data),ZipArchiveMode.Read);
    if(archive.Entries.Count>3000||archive.Entries.Sum(x=>x.Length)>128L*1024*1024)throw new InvalidOperationException("The Office archive exceeds its reading limit.");
    var entries=archive.Entries.Where(e=>e.FullName=="word/document.xml"||e.FullName=="content.xml"||e.FullName=="xl/sharedStrings.xml"||e.FullName.StartsWith("xl/worksheets/sheet")||e.FullName.StartsWith("ppt/slides/slide")&&e.FullName.EndsWith(".xml"))
-    .OrderBy(e=>e.FullName.StartsWith("xl/sharedStrings")?0:1).ThenBy(e=>e.FullName,StringComparer.Ordinal).ToArray();
+    .OrderBy(e=>e.FullName.StartsWith("xl/sharedStrings")?0:1).ThenBy(e=>System.Text.RegularExpressions.Regex.Replace(e.FullName,@"\d+",n=>n.Value.PadLeft(10,'0')),StringComparer.Ordinal).ToArray();
    var shared=new List<string>();
    foreach(var entry in entries)
    {

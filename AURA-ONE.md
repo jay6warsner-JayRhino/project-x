@@ -42,6 +42,6 @@ Use .NET 10.0.401, Android workload, SDK platform 36/build-tools 36.0.0 and JDK 
     node --test OAuthBroker/broker.test.mjs
     dotnet publish AuraOne/AuraOne.csproj -c Release -p:AndroidSdkDirectory="YOUR_SDK" -p:JavaSdkDirectory="YOUR_JDK_21"
 
-CI runs 74 portable checks, 5 broker tests, ARM64 release compilation and native x86_64 emulator smoke checks, including encrypted credentials, PDF text/rendering and actual bundled Vosk recognition. Test presence does not imply a passing run; use the linked CI results. CI's ephemeral signing certificate cannot update the separately delivered signed APK.
+CI runs 79 portable checks, 5 broker tests, ARM64 release compilation and native x86_64 emulator smoke checks, including encrypted credentials, PDF text/rendering and actual bundled Vosk recognition. Test presence does not imply a passing run; use the linked CI results. CI's ephemeral signing certificate cannot update the separately delivered signed APK.
 
 The public export contains generated native/broker source, checks and licensed bundled speech assets. Original private Lovable snapshots, supplied conversation transcripts, reference archives, personal backups and signing secrets are excluded. The private source handover preserves the supplied references/transcripts. The extra source chat ending 1c3a6ff8 and files only named in transcripts remain unavailable; their contents cannot be claimed complete.

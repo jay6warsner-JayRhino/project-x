@@ -25,6 +25,11 @@ public static class ModernChecks
   check(OfflineCommands.Parse("set volume to 50 percent",at)?.Arguments.GetProperty("value").GetString()=="50","offline volume command uses fixed device tool");
   bool invalid=false;try{OfflineCommands.Parse("set volume to 200",at);}catch(InvalidOperationException){invalid=true;}check(invalid,"offline commands retain device bounds");
   check(OfflineCommands.Parse("run shell rm files",at)==null,"offline language does not introduce arbitrary shell commands");
+  check(OfflineCommands.Parse("set volume to fifty percent",at)?.Arguments.GetProperty("value").GetString()=="50","offline volume understands spoken English numbers");
+  check(OfflineCommands.Parse("remind me in ten minutes to stretch",at)?.Arguments.GetProperty("at").GetString()==at.AddMinutes(10).ToString("o"),"offline reminders understand speech-recognized number words");
+  check(OfflineCommands.DocumentPage("read PDF page twenty two")==22,"document page selection understands spoken number words");
+  check(OfflineCommands.Number("erase all files")==null,"unrecognized number input is not executed");
+  using(var ordered=Office(("ppt/slides/slide10.xml","<slide><p>TENTH</p></slide>"),("ppt/slides/slide2.xml","<slide><p>SECOND</p></slide>"))){var result=await DocumentReader.Read(ordered,"ordered.pptx","application/octet-stream");check(result.Text.IndexOf("SECOND")<result.Text.IndexOf("TENTH"),"document sections retain numeric page order");}
   foreach(var broker in new[]{"http://broker.example","https://user:pass@broker.example","https://broker.example/path"}){bool rejected=false;try{OAuthBrokerClient.NormalizeBroker(broker);}catch(InvalidOperationException){rejected=true;}check(rejected,"OAuth broker rejects unsafe origin "+new Uri(broker).Scheme+" configuration");}
   using var handler=new OAuthHttp();using var http=new HttpClient(handler);var client=new OAuthBrokerClient(http);
   var pending=await client.Begin(AccountProvider.Google,"https://broker.example",false,CancellationToken.None);
