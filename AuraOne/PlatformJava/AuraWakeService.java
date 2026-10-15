@@ -13,7 +13,7 @@ public final class AuraWakeService extends Service implements RecognitionListene
  private static final ConcurrentLinkedQueue<String> EVENTS=new ConcurrentLinkedQueue<>();
  private static volatile AuraWakeService active;private static volatile boolean visible;
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
- private SpeechService speech;private Model model;private boolean paused,stopped,loading;private String mode="wake",assistant="jarvis",error="";private long lastWake;private int generation;
+ private SpeechService speech;private Recognizer decoder;private Model model;private boolean paused,stopped,loading;private String mode="wake",assistant="jarvis",error="";private long lastWake;private int generation;
  public static void setVisible(boolean value){visible=value;}
  public static String poll(){return EVENTS.poll();}
  private static void event(String type,String text){try{if(EVENTS.size()<16)EVENTS.add(new JSONObject().put("type",type).put("text",text).toString());}catch(Exception ignored){}}
@@ -44,12 +44,12 @@ public final class AuraWakeService extends Service implements RecognitionListene
     try{Recognizer recognizer;
      if("wake".equals(mode)){JSONArray words=new JSONArray();for(String word:new String[]{"hey jarvis","jarvis","my baby","hey baby","baby","hey aura","aura",assistant.toLowerCase(),"[unk]"})words.put(word);recognizer=new Recognizer(ready,16000,words.toString());}
      else recognizer=new Recognizer(ready,16000);
-     recognizer.setWords(true);speech=new SpeechService(recognizer,16000);speech.startListening(this);notice("wake".equals(mode)?"Listening locally for Hey Baby or your wake phrase":"Listening locally; audio stays on this phone");event("ready",mode);
-    }catch(Throwable e){error="Local microphone unavailable ("+e.getClass().getSimpleName()+")";event("error",error);stopSelf();}
+     decoder=recognizer;recognizer.setWords(true);speech=new SpeechService(recognizer,16000);speech.startListening(this);notice("wake".equals(mode)?"Listening locally for Hey Baby or your wake phrase":"Listening locally; audio stays on this phone");event("ready",mode);
+    }catch(Throwable e){closeSpeech();error="Local microphone unavailable ("+e.getClass().getSimpleName()+")";event("error",error);stopSelf();}
    });
   }catch(Throwable e){MAIN.post(()->{loading=false;error="Local speech setup failed ("+e.getClass().getSimpleName()+")";event("error",error);stopSelf();});}});
  }
- private void closeSpeech(){SpeechService old=speech;speech=null;if(old!=null){old.stop();old.shutdown();}}
+ private void closeSpeech(){SpeechService old=speech;speech=null;Recognizer previous=decoder;decoder=null;try{if(old!=null){old.cancel();old.shutdown();}}catch(Throwable ignored){}finally{if(previous!=null)try{previous.close();}catch(Throwable ignored){}}}
  @Override public void onResult(String result){MAIN.post(()->recognized(result));}
  @Override public void onFinalResult(String result){MAIN.post(()->recognized(result));}
  @Override public void onPartialResult(String result){}
