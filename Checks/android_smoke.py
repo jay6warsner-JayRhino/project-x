@@ -178,7 +178,7 @@ try:
     click('Disconnect GitHub from Aura', scroll=True)
     click('GitHub', scroll=True)
     assert_text('GitHub not authorized', 'account-disconnect')
-    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService', 'AuraWakeService']:
+    for service in ['BabyAccessibilityService', 'BabyNotificationService', 'BabyVoiceService', 'BabyVoiceSessionService', 'BabyRecognitionService', 'AuraWakeService']:
         resolved=adb('shell','cmd','package','query-services','--brief','--components','-n',PACKAGE+'/'+PACKAGE+'.bridge.'+service)
         if service not in resolved:
             raise AssertionError('Native service missing: ' + service)
@@ -232,6 +232,10 @@ try:
     tools()
     click('Connection and permissions status',scroll=True)
     assert_text('Screen capture active: False','screen-sharing-explicit-stop')
+    adb('shell','cmd','role','add-role-holder','--user','0','android.app.role.ASSISTANT',PACKAGE)
+    if PACKAGE not in adb('shell','cmd','role','get-role-holders','--user','0','android.app.role.ASSISTANT'):
+        raise AssertionError('Android did not accept the assistant registration')
+    print('PASS default assistant role accepted by Android',flush=True)
 
     logs = adb('logcat', '-d', '-s', 'AndroidRuntime:E')
     (OUTPUT / 'android-runtime.log').write_text(logs)

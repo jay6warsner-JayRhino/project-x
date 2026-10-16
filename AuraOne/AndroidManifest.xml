@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application android:allowBackup="false" android:usesCleartextTraffic="false" android:icon="@mipmap/appicon" android:label="Aura One" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true">
+    <service android:name="za.co.auraone.assistant.bridge.BabyRecognitionService" android:exported="true" android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE">
+      <intent-filter><action android:name="android.speech.RecognitionService" /></intent-filter>
+    </service>
     <service android:name="za.co.auraone.assistant.bridge.AuraWakeService" android:exported="false" android:foregroundServiceType="microphone" />
     <service android:name="za.co.auraone.assistant.bridge.BabyAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
       <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
