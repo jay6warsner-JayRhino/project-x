@@ -33,13 +33,14 @@ public sealed class GeminiConnection : IDisposable
     }
     public async Task Start()
     {
+        brain.RequireCloud();
         if(Interlocked.Exchange(ref started,1)!=0)throw new InvalidOperationException("This Gemini session has already started.");
         if(!brain.UseRelay&&key.Length==0)throw new InvalidOperationException("Save your Gemini API key in Settings before starting voice. Direct Google access is the default.");
         _=Run();
         await ready.Task.WaitAsync(life.Token);
     }
     object Setup()=>brain.UseRelay
-        ?new{type="app.start",settings=new{resumeHandle=resumable?resumeHandle:null,voice=brain.LiveVoice,persona=brain.ProfilePersona(),personality=brain.Persona,instructions=brain.Instructions,userName=brain.UserName,language=brain.Language,homeCity=brain.HomeCity,timezone=TimeZoneInfo.Local.Id,deep=brain.Deep,roles=brain.Roles,enabledTools=brain.EnabledTools(),memories=brain.Enabled("memory")?brain.Memories:[],notes=brain.Enabled("notes")?brain.Notes:[],reminders=brain.Enabled("reminders")?brain.Reminders.Where(x=>!x.Done).Select(x=>new{text=x.Text,at=x.At.ToString("o")}):[],customSkills=brain.Enabled("skills")?brain.Skills.Select(x=>new{name=x.Name,trigger=x.Trigger,steps=x.Steps}):[]}}
+        ?new{type="app.start",settings=new{resumeHandle=resumable?resumeHandle:null,voice=brain.LiveVoice,persona=brain.ProfilePersona(),personality=brain.Persona,instructions=brain.Instructions,userName=brain.UserName,language=brain.Language,homeCity=brain.HomeCity,timezone=TimeZoneInfo.Local.Id,deep=brain.Deep,roles=brain.Roles,enabledTools=brain.EnabledTools(),memories=brain.Enabled("memory")?brain.Memories:[],notes=brain.Enabled("notes")?brain.Notes:[],reminders=brain.Enabled("reminders")?brain.Reminders.Where(x=>!x.Done).Select(x=>new{text=x.Text,at=x.At.ToString("o")}):[],customSkills=brain.Enabled("skills")?brain.Skills.Where(s=>s.Enabled).Select(x=>new{name=x.Name,trigger=x.Trigger,steps=x.Steps}):[]}}
         :GeminiSetup.Build(brain,resumable?resumeHandle:null);
     async Task Run()
     {
@@ -89,7 +90,7 @@ public sealed class GeminiConnection : IDisposable
                     :error.Message;
                 if(ready.Task.IsCompletedSuccessfully&&resumable&&resumeHandle.Length>0&&retries<3&&error is not Rejected)
                 {
-                    retries++;Emit(new{type="app.reconnecting",message=$"Reconnecting Gemini voice ({retries}/3)…"});
+                    retries++;Emit(new{type="app.reconnecting",message=$"Reconnecting Gemini voice ({retries}/3)Ã¢â‚¬Â¦"});
                     try{await Task.Delay(750*retries,life.Token);}catch(OperationCanceledException){break;}
                     continue;
                 }

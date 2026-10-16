@@ -22,6 +22,7 @@ public static class OfflineCommands
   var reminder=Regex.Match(value,@"^remind me in (.+?) (minute|hour|day)s? to (.+)$",RegexOptions.IgnoreCase);
   if(reminder.Success&&Number(reminder.Groups[1].Value) is {} number){var unit=reminder.Groups[2].Value.ToLowerInvariant();var minutes=number*(unit=="day"?1440L:unit=="hour"?60L:1L);if(minutes<1||minutes>525600)throw new InvalidOperationException("Choose a reminder between one minute and one year away.");var at=now.AddMinutes(minutes);return new("persist_action",JsonSerializer.SerializeToElement(new{type="reminder",text=reminder.Groups[3].Value,at=at.ToString("o")}),"Reminder saved for "+at.ToString("dddd HH:mm")+".");}
   var volume=Regex.Match(low,@"^(?:set )?(?:the )?volume (?:to )?(.+?)(?: percent)?$");if(volume.Success&&Number(volume.Groups[1].Value) is {} level)return Device("volume",level.ToString());
+  var timer=Regex.Match(low,@"^(?:set |start )?(?:a |the )?timer (?:for )?(.+?) minutes?$");if(timer.Success&&Number(timer.Groups[1].Value) is {} duration)return Device("timer",duration.ToString());
   var torch=Regex.Match(low,@"^(?:turn |switch )?(?:the )?(?:flashlight|torch) (on|off)$");if(torch.Success)return Device("flashlight",torch.Groups[1].Value);
   var torchFirst=Regex.Match(low,@"^(?:turn|switch) (on|off) (?:the )?(?:flashlight|torch)$");if(torchFirst.Success)return Device("flashlight",torchFirst.Groups[1].Value);
   return low switch{

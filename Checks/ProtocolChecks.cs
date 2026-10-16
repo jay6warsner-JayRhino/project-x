@@ -10,7 +10,8 @@ public static class ProtocolChecks
     static async Task Until(Func<bool> condition){using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(10));while(!condition())await Task.Delay(10,timeout.Token);}
     public static async Task Run(Action<bool,string> check)
     {
-        check(!new Brain().UseRelay,"direct Google is the default");
+        check(!new Brain().UseRelay,"public relay is off by default");
+        int blockedRequests=0;using(var blockedHttp=new HttpClient(new FakeHttp(_=>{blockedRequests++;return Task.FromResult(Ok("{}"));}))){bool blocked=false;try{await DirectGeminiClient.Ask(new Brain(),"hello",null,"unused",(_,_)=>throw new Exception("Must not execute"),CancellationToken.None,blockedHttp);}catch(InvalidOperationException){blocked=true;}check(blocked&&blockedRequests==0,"local mode prevents a real HTTP client from making a cloud request");}
         var ledger=new ToolCallLedger();
         check(ledger.Begin("one")&&!ledger.Begin("one"),"duplicate tool call is executed once");
         using(var cancelled=JsonDocument.Parse("""{"toolCallCancellation":{"ids":["one","two"]}}"""))ledger.Observe(cancelled.RootElement);
@@ -21,7 +22,7 @@ public static class ProtocolChecks
             check(GeminiConnection.ErrorMessage(nested.RootElement)=="Invalid key","Google errors are surfaced");
         var events=new System.Collections.Concurrent.ConcurrentQueue<JsonElement>();
         var first=new FakeSocket();var second=new FakeSocket();int opens=0;
-        using(var connection=new GeminiConnection(new Brain(),"test-key",e=>events.Enqueue(e),(_,key,_)=>{
+        using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",e=>events.Enqueue(e),(_,key,_)=>{
             if(key!="test-key")throw new Exception("Key header missing");
             return Task.FromResult<WebSocket>(Interlocked.Increment(ref opens)==1?first:second);
         },TimeSpan.FromMilliseconds(500)))
@@ -40,7 +41,7 @@ public static class ProtocolChecks
             check(opens==2,"resumed connection waits for new setup");
         }
         var silent=new FakeSocket();string failure="";
-        using(var connection=new GeminiConnection(new Brain(),"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")failure=e.GetProperty("message").GetString()!;},
+        using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")failure=e.GetProperty("message").GetString()!;},
             (_,_,_)=>Task.FromResult<WebSocket>(silent),TimeSpan.FromMilliseconds(100)))
         {
             try{await connection.Start();}catch(Exception){}
@@ -48,7 +49,7 @@ public static class ProtocolChecks
             check(!connection.Connected&&failure.Contains("timeout"),"silent setup fails with a deadline");
         }
         var initial=new FakeSocket();var resumed=new FakeSocket();opens=0;failure="";
-        using(var connection=new GeminiConnection(new Brain(),"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")failure=e.GetProperty("message").GetString()!;},
+        using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")failure=e.GetProperty("message").GetString()!;},
             (_,_,_)=>Task.FromResult<WebSocket>(Interlocked.Increment(ref opens)==1?initial:resumed),TimeSpan.FromMilliseconds(100)))
         {
             var start=connection.Start();await Until(()=>initial.Sent.Count>0);
@@ -68,7 +69,7 @@ public static class ProtocolChecks
                 :"""{"candidates":[{"content":{"role":"model","parts":[{"text":"Four."}]}}]}""");
         })))
         {
-            var reply=await DirectGeminiClient.Ask(new Brain(),"Calculate two plus two",null,secret,(name,args)=>{
+            var reply=await DirectGeminiClient.Ask(new Brain{LocalMode=false},"Calculate two plus two",null,secret,(name,args)=>{
                 executions++;return Task.FromResult<object>(new{result=Calculator.Evaluate(args.GetProperty("expression").GetString()!)});
             },CancellationToken.None,http);
             check(reply=="Four."&&executions==1&&requests.Count==2,"direct fallback completes a tool round trip");
@@ -77,13 +78,13 @@ public static class ProtocolChecks
         }
         using(var http=new HttpClient(new FakeHttp(_=>Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden){Content=new StringContent("""{"error":{"message":"Rejected dummy-provider-key"}}""")}))))
         {
-            string error="";try{await DirectGeminiClient.Ask(new Brain(),"hello",null,secret,(_,_)=>throw new Exception("Must not execute"),CancellationToken.None,http);}catch(Exception e){error=e.Message;}
+            string error="";try{await DirectGeminiClient.Ask(new Brain{LocalMode=false},"hello",null,secret,(_,_)=>throw new Exception("Must not execute"),CancellationToken.None,http);}catch(Exception e){error=e.Message;}
             check(error.Contains("[redacted]")&&!error.Contains(secret),"fallback errors redact the device key");
         }
         using(var cancellation=new CancellationTokenSource())
         using(var http=new HttpClient(new FakeHttp(_=>{cancellation.Cancel();return Task.FromResult(Ok("""{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"persist_action","args":{"type":"note","text":"No"}}}]}}]}"""));})))
         {
-            executions=0;try{await DirectGeminiClient.Ask(new Brain(),"hello",null,secret,(_,_)=>{executions++;return Task.FromResult<object>(new{});},cancellation.Token,http);}catch(OperationCanceledException){}
+            executions=0;try{await DirectGeminiClient.Ask(new Brain{LocalMode=false},"hello",null,secret,(_,_)=>{executions++;return Task.FromResult<object>(new{});},cancellation.Token,http);}catch(OperationCanceledException){}
             check(executions==0,"cancelled fallback cannot perform a tool action");
         }
     }

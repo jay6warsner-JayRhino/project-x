@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace AuraOne;
 
-public sealed class Skill { public string Name { get; set; } = ""; public string Trigger { get; set; } = ""; public string Steps { get; set; } = ""; }
+public sealed class Skill { public string Name { get; set; } = ""; public string Trigger { get; set; } = ""; public string Steps { get; set; } = ""; public bool Enabled { get; set; } = true; public string Kind { get; set; } = "custom"; }
 public sealed class Reminder { public int Id { get; set; } = Random.Shared.Next(1, int.MaxValue); public string Text { get; set; } = ""; public DateTimeOffset At { get; set; } public bool Done { get; set; } }
 public sealed class Turn { public string Id { get; set; } = Guid.NewGuid().ToString(); public DateTimeOffset At { get; set; } = DateTimeOffset.Now; public string You { get; set; } = ""; public string Reply { get; set; } = ""; public string Mode { get; set; } = "Assistant"; }
 public sealed class Brain
@@ -21,6 +21,8 @@ public sealed class Brain
     public string AssistantUrl { get; set; } = "https://aura-your-pal.lovable.app/api/assistant";
     public string LiveUrl { get; set; } = "wss://aura-your-pal.lovable.app/api/gemini-live";
     public bool UseRelay { get; set; }
+    public bool LocalMode { get; set; } = true;
+    public bool StarterRoutinesAdded { get; set; }
     public bool WakeWord { get; set; }
     public bool Captions { get; set; }
     public bool Deep { get; set; }
@@ -35,6 +37,14 @@ public sealed class Brain
     public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["documents"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
     public bool Enabled(string tool) => Tools.TryGetValue(tool, out var enabled) && enabled;
     public string[] EnabledTools() => Tools.Where(x => x.Value).Select(x => x.Key).ToArray();
+    public void RequireCloud(){if(LocalMode)throw new InvalidOperationException("Online AI is off. On-device mode uses no API key or cloud credits. Enable optional online AI in Settings to use this feature.");}
+    public void AddStarterRoutines()
+    {
+        if(StarterRoutinesAdded)return;
+        foreach(var item in new[]{("Good morning","good morning","Read today's reminders and notes","morning"),("Bedtime","bedtime","Prepare an alarm for 06:30","bedtime"),("Focus","focus time","Lower media volume to 20 percent","focus"),("Driving","driving mode","Read notification source summaries","driving")})
+            if(!Skills.Any(s=>s.Name.Equals(item.Item1,StringComparison.OrdinalIgnoreCase)))Skills.Add(new Skill{Name=item.Item1,Trigger=item.Item2,Steps=item.Item3,Kind=item.Item4,Enabled=false});
+        StarterRoutinesAdded=true;
+    }
     public void Record(Turn turn) { History.Insert(0, turn); if (History.Count > 500) History.RemoveRange(500, History.Count - 500); }
     public IEnumerable<Turn> Search(string query) => History.Where(x => (x.You + " " + x.Reply).Contains(query, StringComparison.OrdinalIgnoreCase));
     public string ProfilePersona() => $"Your name is {AssistantName}. {Persona} The user's name is {UserName}. Active helper roles: {string.Join(", ", Roles)}.";

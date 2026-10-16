@@ -37,6 +37,8 @@ jobs:
       - run: dotnet workload install android --skip-manifest-update
       - name: Install Android dependencies
         run: dotnet build AuraOne/AuraOne.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSdkLicenses=True -v:minimal
+      - name: Prepare verified bundled local model
+        run: python3 AuraOne/prepare_model.py
       - name: Compile release APK
         run: dotnet publish AuraOne/AuraOne.csproj -c Release -r android-arm64 -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME"
       - name: Select one signed APK
@@ -55,7 +57,7 @@ jobs:
   emulator:
     needs: checks
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       AURA_ANDROID_SDK: /tmp/aura-android-sdk
       AURA_TEST_OUTPUT: android-smoke-output
@@ -72,6 +74,8 @@ jobs:
       - run: dotnet workload install android --skip-manifest-update
       - name: Install Android dependencies
         run: dotnet build AuraOne/AuraOne.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSdkLicenses=True -v:minimal
+      - name: Prepare verified bundled local model
+        run: python3 AuraOne/prepare_model.py
       - name: Build native emulator APK
         run: dotnet publish AuraOne/AuraOne.csproj -c Release -r android-x64 -p:RuntimeIdentifiers=android-x64 -m:1 -p:UseSharedCompilation=false -p:AndroidSdkDirectory="$AURA_ANDROID_SDK" -p:JavaSdkDirectory="$JAVA_HOME"
       - name: Install emulator image
@@ -84,7 +88,7 @@ jobs:
           echo no | "$AURA_AVDMANAGER" create avd -n aura_ci -p "$ANDROID_AVD_HOME/aura_ci.avd" -k "system-images;android-35;google_apis;x86_64" --force
           sudo chmod 666 /dev/kvm
       - name: Run native smoke checks
-        timeout-minutes: 12
+        timeout-minutes: 18
         shell: bash
         run: |
           export ANDROID_HOME="$AURA_ANDROID_SDK"
@@ -92,16 +96,17 @@ jobs:
           export PATH="$AURA_ANDROID_SDK/platform-tools:$PATH"
           mkdir -p android-smoke-output
           "$AURA_ANDROID_SDK/emulator/emulator" -list-avds | tee android-smoke-output/available-avds.txt
-          "$AURA_ANDROID_SDK/emulator/emulator" -avd aura_ci -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -memory 2048 -cores 2 > android-smoke-output/emulator.log 2>&1 &
+          "$AURA_ANDROID_SDK/emulator/emulator" -avd aura_ci -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect -memory 4096 -cores 2 > android-smoke-output/emulator.log 2>&1 &
           timeout 60 adb wait-for-device
           timeout 180 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
           adb shell input keyevent 82
           AURA_TEST_APK=$(find AuraOne/bin/Release -name "*-Signed.apk" -print -quit)
           adb install "$AURA_TEST_APK"
-          timeout 600 python3 Checks/android_smoke.py
+          timeout 900 python3 Checks/android_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: aura-native-emulator-evidence
           path: android-smoke-output/
           retention-days: 3
+

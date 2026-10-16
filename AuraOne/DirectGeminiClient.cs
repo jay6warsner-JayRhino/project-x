@@ -9,6 +9,7 @@ public static class DirectGeminiClient
     public static async Task<string> Ask(Brain brain,string text,string? frame,string key,
         Func<string,JsonElement,Task<object>> execute,CancellationToken cancellation,HttpClient? client=null)
     {
+        brain.RequireCloud();
         key=key.Trim();
         if(key.Length==0)throw new InvalidOperationException("Save your Gemini API key in Settings. Device voice uses Google directly unless you select the optional relay.");
         var http=client??DefaultHttp;

@@ -39,6 +39,7 @@ public sealed class NativeAccounts(Context context):IAccountAccessTokenProvider
     }
     public async Task<object> Run(string name,JsonElement args,Brain brain,CancellationToken cancellation)
     {
+        brain.RequireCloud();
         var group=name switch{"gmail_search" or "gmail_message"=>"gmail","calendar_upcoming"=>"calendar","drive_search"=>"drive","github_repositories" or "github_issues"=>"github",_=>""};
         if(group.Length==0||!brain.Enabled(group))throw new InvalidOperationException("This account tool is disabled.");
         string S(string key)=>args.TryGetProperty(key,out var value)&&value.ValueKind==JsonValueKind.String?value.GetString()??"":"";

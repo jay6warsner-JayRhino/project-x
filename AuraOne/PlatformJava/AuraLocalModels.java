@@ -7,17 +7,27 @@ import com.google.ai.edge.litertlm.*;
 public final class AuraLocalModels {
  private AuraLocalModels(){} private static Engine engine;private static volatile Conversation current;private static volatile boolean cancelled;
  public static synchronized String generate(Context context,String prompt){
-  File file=new File(context.getFilesDir(),"offline-model.litertlm");
-  if(!file.isFile())return "ERROR:Import a compatible LiteRT-LM language model in Offline setup first.";
+  File file;
+  try{file=languageModel(context);}catch(Exception error){return "ERROR:The bundled language model could not be prepared ("+error.getClass().getSimpleName()+"). Check available phone storage.";}
   if(prompt==null||prompt.length()>16000)return "ERROR:Offline context exceeds 16,000 characters.";
   try{cancelled=false;
    if(engine==null){engine=new Engine(new EngineConfig(file.getPath(),new Backend.CPU(2,null),null,null,2048,null,context.getCacheDir().getPath(),null));engine.initialize();}
    if(cancelled)return "ERROR:Cancelled.";
    try(Conversation conversation=engine.createConversation(new ConversationConfig())){current=conversation;String answer=conversation.sendMessage(prompt+"\n/no_think",java.util.Collections.emptyMap(),null,null,null,256,new ThinkingConfig(false,0),null).toString();return answer.length()>16000?answer.substring(0,16000):answer;}finally{current=null;}
-  }catch(Throwable error){release();return "ERROR:Offline model could not run ("+error.getClass().getSimpleName()+"). Choose a compatible CPU model.";}
+  }catch(Throwable error){android.util.Log.w("AuraLocal", "Inference failure: "+error.getClass().getSimpleName()+": "+error.getMessage());release();return "ERROR:Offline model could not run ("+error.getClass().getSimpleName()+"). Choose a compatible CPU model.";}
  }
  public static synchronized void release(){if(engine!=null){try{engine.close();}catch(Throwable ignored){}engine=null;}}
  public static void cancel(){cancelled=true;Conversation conversation=current;if(conversation!=null)try{conversation.cancelProcess();}catch(Throwable ignored){}}
+ public static File languageModel(Context context)throws Exception{
+  File file=new File(context.getFilesDir(),"offline-model.litertlm");if(file.isFile()&&file.length()>1024)return file;
+  File temporary=new File(context.getFilesDir(),"offline-model.preparing");java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");long total=0;
+  try(InputStream input=context.getAssets().open("offline-model.litertlm");OutputStream output=new FileOutputStream(temporary)){
+   byte[] bytes=new byte[65536];int count;while((count=input.read(bytes))!=-1){total+=count;if(total>350000000L)throw new IOException("Model exceeds bound");hash.update(bytes,0,count);output.write(bytes,0,count);}
+  }
+  StringBuilder digest=new StringBuilder();for(byte b:hash.digest())digest.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+  if(total!=344671744L||!digest.toString().equals("03e7da1eb1108b50dffaa9bb52cc7bcbad2eb0c66ca990267f480c1e545d2856"))throw new IOException("Model integrity failed");
+  if(!temporary.renameTo(file))throw new IOException("Model installation failed");return file;
+ }
  public static String testSpeech(Context context){
   try(org.vosk.Model model=new org.vosk.Model(speechModel(context).getAbsolutePath());org.vosk.Recognizer recognizer=new org.vosk.Recognizer(model,16000);InputStream input=context.getAssets().open("offline-test.wav")){
    byte[] header=new byte[44];int position=0;while(position<44){int count=input.read(header,position,44-position);if(count<0)throw new IOException("Invalid test WAV");position+=count;}

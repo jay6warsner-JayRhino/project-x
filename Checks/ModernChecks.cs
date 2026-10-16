@@ -12,6 +12,11 @@ public static class ModernChecks
 {
  public static async Task Run(Action<bool,string> check)
  {
+  var local=new Brain();check(local.LocalMode&&!local.UseRelay,"new installations default to local AI without a relay");
+  check(Brain.Import("{\"AssistantUrl\":\"https://example.com\"}").LocalMode,"older backups migrate to local AI by default");
+  bool cloudBlocked=false;try{local.RequireCloud();}catch(InvalidOperationException){cloudBlocked=true;}check(cloudBlocked,"local mode blocks cloud entry points");
+  local.AddStarterRoutines();local.AddStarterRoutines();check(local.Skills.Count==4&&local.Skills.All(s=>!s.Enabled),"starter routines are added once and start paused");
+  local.Skills[0].Enabled=true;var restored=Brain.Import(Brain.Export(local));check(restored.LocalMode&&restored.Skills[0].Enabled&&!restored.Skills[1].Enabled,"mode and routine toggles survive backup");
   using var text=new MemoryStream(Encoding.UTF8.GetBytes(new string('a',65000)));var plain=await DocumentReader.Read(text,"note.txt","text/plain");check(plain.Truncated&&plain.Text.Length==60000,"document text limit is explicit and bounded");
   using var word=Office(("word/document.xml","<document><p><t>Voice assistant document</t></p></document>"));var doc=await DocumentReader.Read(word,"sample.docx","application/vnd.openxmlformats-officedocument.wordprocessingml.document");check(doc.Text.Contains("Voice assistant document"),"DOCX text extracted without running Office code");
   using var slides=Office(("ppt/slides/slide1.xml","<slide><p><t>Slide one</t></p></slide>"));check((await DocumentReader.Read(slides,"sample.pptx","application/octet-stream")).Text.Contains("Slide one"),"PPTX slide text extracted");
@@ -24,6 +29,8 @@ public static class ModernChecks
   var at=DateTimeOffset.Parse("2026-10-15T12:00:00+02:00");var reminder=OfflineCommands.Parse("remind me in 10 minutes to stretch",at)!;check(reminder.Arguments.GetProperty("at").GetString()==at.AddMinutes(10).ToString("o"),"offline reminder preserves the device timezone");
   check(OfflineCommands.Parse("set volume to 50 percent",at)?.Arguments.GetProperty("value").GetString()=="50","offline volume command uses fixed device tool");
   bool invalid=false;try{OfflineCommands.Parse("set volume to 200",at);}catch(InvalidOperationException){invalid=true;}check(invalid,"offline commands retain device bounds");
+  check(OfflineCommands.Parse("set a timer for five minutes",at)?.Arguments.GetProperty("value").GetString()=="5","spoken timer uses a fixed bounded device action");
+  bool timerBound=false;try{OfflineCommands.Parse("set a timer for three hundred minutes",at);}catch(InvalidOperationException){timerBound=true;}check(timerBound,"spoken timers enforce the device limit");
   check(OfflineCommands.Parse("run shell rm files",at)==null,"offline language does not introduce arbitrary shell commands");
   check(OfflineCommands.Parse("set volume to fifty percent",at)?.Arguments.GetProperty("value").GetString()=="50","offline volume understands spoken English numbers");
   check(OfflineCommands.Parse("remind me in ten minutes to stretch",at)?.Arguments.GetProperty("at").GetString()==at.AddMinutes(10).ToString("o"),"offline reminders understand speech-recognized number words");
