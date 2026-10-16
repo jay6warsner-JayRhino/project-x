@@ -195,10 +195,8 @@ try:
     click('Talk')
     click('Share screen',scroll=True)
     consent=dump('screen-sharing-consent')
-    options=[n.get('text','') for n in consent.iter('node') if n.get('text','').lower() in ['entire screen','your entire screen','share entire screen']]
-    if options: click(options[0])
     consent=dump('screen-sharing-start-control')
-    choices=[n.get('text','') for n in consent.iter('node') if n.get('text','').lower() in ['start now','start sharing','share screen'] and 'Button' in n.get('class','')]
+    choices=[n.get('text','') for n in consent.iter('node') if n.get('text','').lower() in ['start','start now','start sharing','share screen'] and 'Button' in n.get('class','')]
     if not choices: raise AssertionError('Android screen-sharing approval control not found')
     click(choices[0])
     time.sleep(4)

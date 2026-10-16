@@ -26,7 +26,7 @@ public sealed class GeminiConnection : IDisposable
     {this.brain=brain;this.key=key.Trim();this.onEvent=onEvent;connect=connector??Open;this.setupTimeout=setupTimeout??TimeSpan.FromSeconds(30);}
     static async Task<WebSocket> Open(Uri endpoint,string key,CancellationToken cancellation)
     {
-        var socket=new ClientWebSocket();socket.Options.KeepAliveInterval=TimeSpan.FromSeconds(15);
+        var socket=new ClientWebSocket();socket.Options.KeepAliveInterval=TimeSpan.FromSeconds(15);socket.Options.KeepAliveTimeout=TimeSpan.FromSeconds(20);
         if(key.Length>0)socket.Options.SetRequestHeader("x-goog-api-key",key);
         else socket.Options.SetRequestHeader("Origin",new UriBuilder(endpoint){Scheme="https",Path="",Query="",Port=endpoint.IsDefaultPort?-1:endpoint.Port}.Uri.GetLeftPart(UriPartial.Authority));
         try{await socket.ConnectAsync(endpoint,cancellation);return socket;}catch{socket.Dispose();throw;}
