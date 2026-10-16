@@ -174,7 +174,7 @@
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
-   
+
 EXTERNAL COMPONENTS
 
 PdfPig includes a number of components with separate copyright notices
@@ -220,7 +220,7 @@ Adobe Font Metrics (AFM) for PDF Core 14 Fonts
    AFM files are not distributed without this file; that all modifications
    to this file or any of the AFM files are prominently noted in the modified
    file(s); and that this paragraph is not modified. Adobe Systems has no
-   responsibility or obligation to support the use of the AFM files. 
+   responsibility or obligation to support the use of the AFM files.
 
 CMaps for PDF Fonts (http://opensource.adobe.com/wiki/display/cmap/Downloads)
 
@@ -236,11 +236,11 @@ CMaps for PDF Fonts (http://opensource.adobe.com/wiki/display/cmap/Downloads)
 
    Redistributions in binary form must reproduce the above copyright notice,
    this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution. 
+   and/or other materials provided with the distribution.
 
    Neither the name of Adobe Systems Incorporated nor the names of its
    contributors may be used to endorse or promote products derived from this
-   software without specific prior written permission. 
+   software without specific prior written permission.
 
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
