@@ -13,6 +13,11 @@ public static class ModernChecks
  public static async Task Run(Action<bool,string> check)
  {
   var local=new Brain();check(local.LocalMode&&!local.UseRelay,"new installations default to local AI without a relay");
+  local.Notes.Add("Research artifact: blue notebook");local.History.Add(new Turn{You="Where is the blue folder?",Reply="On the desk."});
+  check(LocalKnowledge.Search(local,"blue").Count==2,"knowledge search retrieves saved notes and conversation excerpts");
+  local.Tools["notes"]=local.Tools["history"]=false;check(LocalKnowledge.Search(local,"blue").Count==0,"disabled knowledge groups are excluded");
+  local.Tools["notes"]=true;local.Notes.AddRange(Enumerable.Repeat(new string('a',2000),20));check(LocalKnowledge.Search(local,"").Count==12&&LocalKnowledge.Search(local,"").All(h=>h.Text.Length<=1210),"knowledge results and excerpts are bounded");
+  bool longQuery=false;try{LocalKnowledge.Search(local,new string('q',201));}catch(InvalidOperationException){longQuery=true;}check(longQuery,"knowledge search rejects excessive queries");
   check(Brain.Import("{\"AssistantUrl\":\"https://example.com\"}").LocalMode,"older backups migrate to local AI by default");
   bool cloudBlocked=false;try{local.RequireCloud();}catch(InvalidOperationException){cloudBlocked=true;}check(cloudBlocked,"local mode blocks cloud entry points");
   local.AddStarterRoutines();local.AddStarterRoutines();check(local.Skills.Count==4&&local.Skills.All(s=>!s.Enabled),"starter routines are added once and start paused");

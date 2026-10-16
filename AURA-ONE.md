@@ -1,4 +1,4 @@
-# Aura One 1.4 native Android voice assistant
+# Aura One 1.5 native Android voice assistant
 
 Light Talk, Chats and Routines screens follow the supplied design reference. Talk uses a native blue/lilac/coral animated orb, spoken input and audio replies. Chats displays actual saved conversations; there is no typed conversational input. Settings, history search and consent use native text controls.
 
@@ -29,3 +29,11 @@ Public sources contain generated native/broker code and licensed speech assets. 
 
 Local model: https://huggingface.co/litert-community/Qwen3-0.6B (Apache-2.0).
 Model bytes: 344671744. SHA-256: 03e7da1eb1108b50dffaa9bb52cc7bcbad2eb0c66ca990267f480c1e545d2856.
+
+## Version 1.5 reliability update
+
+Successful Gemini session renewal now resets the consecutive network retry budget. Quota/authorization rejection terminates cleanly without retry loops or substituting another AI. Video uploads have one in-flight frame; stale frames do not form an unbounded queue. Screen capture handles content resize/rotation and suppresses events from replaced sessions. Each new screen session still requires Android consent, and Android stops projection on screen lock. The voice foreground service renews a bounded CPU wake lock while active and releases it on stop.
+
+The local_search tool retrieves up to 12 enabled memory, note, reminder, routine and conversation excerpts; disabled groups and credential stores are excluded. Diagnostics shows mode, grounding/reasoning settings and actual screen activity/frame count. The owner requested Gemini on the A56; switching the installed preference preserves local data and does not transfer any account tokens.
+
+The saved key authenticates and lists Gemini 3.8 Live, but a fresh real Live setup test on 16 October 2026 was rejected for quota. Neither session resumption nor context compression removes provider quotas or guarantees free all-day use. Account OAuth registration and unavailable source-chat contents remain incomplete; no claim of every external plugin/model being available is made.

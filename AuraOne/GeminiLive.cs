@@ -17,7 +17,7 @@ public sealed class GeminiLive : IDisposable
     GeminiConnection? connection;
     AudioRecord? microphone;AudioTrack? speaker;AcousticEchoCanceler? echo;NoiseSuppressor? noise;
     AudioManager? manager;Mode previousMode;AudioDeviceInfo? previousDevice;bool previousSpeaker;
-    volatile bool closed,muted;int epoch;Task? stopping;
+    volatile bool closed,muted;int epoch,frameSending;Task? stopping;
     public bool Connected=>!closed&&connection?.Connected==true;
     public CancellationToken Cancellation=>life.Token;
     public GeminiLive(Context context,Brain brain,Action<JsonElement> onEvent){this.context=context;this.brain=brain;this.onEvent=onEvent;}
@@ -114,7 +114,8 @@ public sealed class GeminiLive : IDisposable
     public bool FirstToolCall(string id)=>connection?.FirstToolCall(id)==true;
     public bool CanCompleteTool(string id)=>!closed&&connection?.CanCompleteTool(id)==true;
     public void SetMuted(bool value){muted=value;if(value&&Connected)Send(new{realtimeInput=new{audioStreamEnd=true}});}
-    public void SendFrame(string value){if(Connected)Send(new{realtimeInput=new{video=new{mimeType="image/jpeg",data=value}}});}
+    public void SendFrame(string value){if(Connected&&Interlocked.CompareExchange(ref frameSending,1,0)==0)_=SendLatestFrame(value);}
+    async Task SendLatestFrame(string value){try{await SafeSend(new{realtimeInput=new{video=new{mimeType="image/jpeg",data=value}}});}finally{Interlocked.Exchange(ref frameSending,0);}}
     public void Send(object value){if(Connected)_=SafeSend(value);}
     async Task SafeSend(object value){try{if(connection!=null)await connection.Send(value);}catch(OperationCanceledException){}catch(Exception e){if(!closed)Fail(e.Message);}}
     void Fail(string message)

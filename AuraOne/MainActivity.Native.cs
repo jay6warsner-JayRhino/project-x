@@ -32,7 +32,7 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
         base.OnCreate(state); store=new BrainStore(FilesDir!.AbsolutePath); brain=store.Load(); brain.AddStarterRoutines(); Save(); accounts=new NativeAccounts(this); tts=new TextToSpeech(this,this);
         Window!.SetSoftInputMode(SoftInput.AdjustResize);
         if(SpeechRecognizer.IsRecognitionAvailable(this)){recognizer=SpeechRecognizer.CreateSpeechRecognizer(this);recognizer.SetRecognitionListener(this);}
-        LiveService.StopRequested+=OnLiveStopRequested; ReminderReceiver.Delivered+=OnReminderDelivered;CaptureService.Frame+=OnFrame; CaptureService.Ended+=OnCaptureEnded; ReminderReceiver.Reschedule(this,brain); Render();InitializeLocalFeatures();if(Intent?.Data?.Scheme=="za.co.auraone.assistant")handler.Post(()=>_=CompleteAccountAuthorization(Intent.Data.ToString()));else if(Intent?.GetBooleanExtra("aura_start_voice",false)==true)handler.PostDelayed(()=>{if(!disposed)ToggleTalk();},700);
+        LiveService.StopRequested+=OnLiveStopRequested; ReminderReceiver.Delivered+=OnReminderDelivered;CaptureService.Frame+=OnFrame; CaptureService.Failed+=OnCaptureFailed; CaptureService.Ended+=OnCaptureEnded; ReminderReceiver.Reschedule(this,brain); Render();InitializeLocalFeatures();if(Intent?.Data?.Scheme=="za.co.auraone.assistant")handler.Post(()=>_=CompleteAccountAuthorization(Intent.Data.ToString()));else if(Intent?.GetBooleanExtra("aura_start_voice",false)==true)handler.PostDelayed(()=>{if(!disposed)ToggleTalk();},700);
     }
     public void OnInit(OperationResult result){if(result==OperationResult.Success)Voice();}
     void Voice(){tts?.SetLanguage(Java.Util.Locale.ForLanguageTag(brain.Language));tts?.SetSpeechRate(brain.VoiceRate);tts?.SetPitch(brain.VoicePitch);}
@@ -119,6 +119,11 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
     void DiagnosticsPage()
     {
         Section("Ready to talk");
+        Add(page,Text("Voice mode: "+(brain.LocalMode?"On-device":"Gemini Live 3.8")));
+        Add(page,Text("Screen capture active: "+CaptureService.Active)); Add(page,Text("Captured frames: "+CaptureService.CapturedFrames));
+        Add(page,Text("Google Search grounding: "+(brain.Enabled("web")?"Enabled":"Disabled")));
+        Add(page,Text("Extended reasoning: "+(brain.Deep?"Enabled":"Disabled")));
+        Add(page,Text($"Local knowledge: {brain.Memories.Count} memories · {brain.Notes.Count} notes · {brain.History.Count} conversations · {DeviceActions.All.Length} fixed device operations"));
         Add(page,Text("Gemini key: "+(KeyVault.Load(this).Length>0?"Saved on this phone":"Required for direct voice")));
         Add(page,Text("Connection: "+(live?.Connected==true?"Live voice connected":live!=null?"Connecting":"No active session")));
         Add(page,Text("Microphone permission: "+CheckSelfPermission(Manifest.Permission.RecordAudio)));
@@ -151,13 +156,14 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
         Section("Voice");Add(page,Text("Device speech rate",12));var rate=new SeekBar(this){Max=100,Progress=(int)((brain.VoiceRate-.5f)*50)};Add(page,rate);Add(page,Text("Device speech pitch",12));var pitch=new SeekBar(this){Max=100,Progress=(int)((brain.VoicePitch-.5f)*50)};Add(page,pitch);
         var voices=new Spinner(this);var options=GeminiVoices.All;voices.Adapter=new ArrayAdapter<string>(this,Android.Resource.Layout.SimpleSpinnerDropDownItem,options);voices.SetSelection(Math.Max(0,Array.IndexOf(options,brain.LiveVoice)));Add(page,voices);Add(page,Text("Gemini Live uses the selected native audio voice. Device voice uses Android speech services.",12,Subtle));
         Section("Optional Gemini API key","On-device AI is the default. Enable optional online AI only if you want Gemini. Google API quota/billing applies to online mode. Keys are encrypted on the phone and excluded from backups.");
-        var key=Field("",KeyVault.Load(this).Length>0?"Device key saved · enter a new key to replace":"Enter your Gemini API key on this phone");key.InputType=Android.Text.InputTypes.ClassText|Android.Text.InputTypes.TextVariationPassword;Add(page,key);
-        Add(page,Btn("Save device key",()=>{if(string.IsNullOrWhiteSpace(key.Text)){Error("Enter your Gemini API key first.");return;}KeyVault.Save(this,key.Text);key.Text="";Toast.MakeText(this,"Gemini device key saved",ToastLength.Short)?.Show();}),D(44));
+        var key=Field("",KeyVault.Load(this).Length>0?"Device key saved · enter a new key to replace":"Enter your Gemini API key on this phone");key.InputType=Android.Text.InputTypes.ClassText|Android.Text.InputTypes.TextVariationPassword;key.ContentDescription="Gemini API key";key.SetSingleLine(true);key.ImeOptions=Android.Views.InputMethods.ImeAction.Done;key.EditorAction+=(_,e)=>{if(e.ActionId==Android.Views.InputMethods.ImeAction.Done||e.Event?.KeyCode==Keycode.Enter){e.Handled=true;if(e.Event==null||e.Event.Action==KeyEventActions.Down)SaveGeminiKey(key);}};Add(page,key);
+        Add(page,Btn("Save device key",()=>{SaveGeminiKey(key);}),D(44));
         Add(page,Btn("Remove device key",()=>Confirm("Remove device key?","Direct voice will need a new key. You can choose the optional server relay in Connections.",()=>KeyVault.Save(this,""))),D(42));
         Section("Connections","Use the optional server relay only if it has a working Gemini key. Direct mode sends audio and requests to Google using the encrypted device key.");Toggle("Use optional server relay",brain.UseRelay,x=>brain.UseRelay=x);var url=Field(brain.AssistantUrl,"HTTPS assistant endpoint");var liveUrl=Field(brain.LiveUrl,"WSS live relay endpoint");Add(page,url);Add(page,liveUrl);
         Add(page,Btn("Save settings",()=>{if(!Uri.TryCreate(url.Text,UriKind.Absolute,out var u)||u.Scheme!="https"){Error("Use an HTTPS assistant URL.");return;}if(!string.IsNullOrWhiteSpace(liveUrl.Text)&&(!Uri.TryCreate(liveUrl.Text,UriKind.Absolute,out var l)||l.Scheme!="wss")){Error("Use a WSS live relay URL.");return;}brain.AssistantName=string.IsNullOrWhiteSpace(name.Text)?"Jarvis":name.Text.Trim();brain.UserName=user.Text??"";brain.Persona=persona.Text??"";brain.Instructions=instruction.Text??"";brain.HomeCity=city.Text??"";brain.Language=lang.Text??"en-GB";brain.VoiceRate=.5f+rate.Progress/50f;brain.VoicePitch=.5f+pitch.Progress/50f;brain.LiveVoice=options[voices.SelectedItemPosition];brain.AssistantUrl=url.Text!.Trim();brain.LiveUrl=liveUrl.Text?.Trim()??"";Save();Voice();tab="Home";Render();},true),D(48));
-        Add(page,Btn("Check Gemini Live connection",()=>_=Check()),D(44));Add(page,Text("Aura One 1.4 · On-device Android assistant\nAccount integrations and device-specific behaviour still need end-to-end validation.",12,Subtle));
+        Add(page,Btn("Check Gemini Live connection",()=>_=Check()),D(44));Add(page,Text("Aura One 1.5 · Native Android assistant\nAccount integrations and device-specific behaviour still need end-to-end validation.",12,Subtle));
     }
+    void SaveGeminiKey(EditText field){var value=field.Text?.Trim()??"";if(value.Length==0){Error("Enter your Gemini API key first.");return;}KeyVault.Save(this,value);field.Text="";Toast.MakeText(this,"Gemini device key saved",ToastLength.Short)?.Show();}
     void NewReminder(){var c=Col();c.SetPadding(D(18),0,D(18),0);var text=Field("","Reminder");var at=Field(DateTimeOffset.Now.AddMinutes(5).ToString("yyyy-MM-dd HH:mm zzz"),"Date and time with offset");Add(c,text);Add(c,at);new AlertDialog.Builder(this)!.SetTitle("New reminder")!.SetView(c)!.SetNegativeButton("Cancel",(_,_)=>{})!.SetPositiveButton("Save",(_,_)=>{if(string.IsNullOrWhiteSpace(text.Text)||!DateTimeOffset.TryParse(at.Text,out var when)||when<=DateTimeOffset.Now){Error("Enter a reminder and a future date/time.");return;}var r=new Reminder{Text=text.Text.Trim(),At=when};brain.Reminders.Add(r);Save();Notifications(()=>ReminderReceiver.Schedule(this,r));Render();})!.Show();}
     void NewSkill(){var c=Col();c.SetPadding(D(18),0,D(18),0);var name=Field("","Routine name");var trigger=Field("","When I say…");var steps=Field("","Follow these steps",true);foreach(var f in new[]{name,trigger,steps})Add(c,f);new AlertDialog.Builder(this)!.SetTitle("Teach a routine")!.SetView(c)!.SetNegativeButton("Cancel",(_,_)=>{})!.SetPositiveButton("Save",(_,_)=>{if(new[]{name.Text,trigger.Text,steps.Text}.Any(string.IsNullOrWhiteSpace)){Error("Complete all three fields.");return;}brain.Skills.Add(new Skill{Name=name.Text!.Trim(),Trigger=trigger.Text!.Trim(),Steps=steps.Text!.Trim()});Save();Render();})!.Show();}
     void Permission(string permission,Action action){if(CheckSelfPermission(permission)==Android.Content.PM.Permission.Granted)action();else{permissionAction=action;RequestPermissions([permission],42);}}
@@ -230,7 +236,7 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
     void StopLive(){StopService(new Intent(this,typeof(LiveService)));var old=live;live=null;if(old!=null)audioStopped=old.StopAsync();FlushLive();if(backgroundWake)_=ResumeWake(audioStopped);}
     void GeminiEvent(GeminiLive session,JsonElement e)=>RunOnUiThread(()=>{
         if(!ReferenceEquals(live,session)||disposed)return;
-        if(e.TryGetProperty("type",out var eventType)){var type=eventType.GetString();if(type=="app.connected"){Status("Gemini Live · Listening");if(orb!=null){orb.Active=true;orb.Invalidate();}}else if(type is "app.status" or "app.reconnecting"&&e.TryGetProperty("message",out var statusMessage))Status(statusMessage.GetString()??"");else if(type=="app.error"){StopLive();var message=e.TryGetProperty("message",out var msg)?msg.GetString():e.TryGetProperty("error",out var err)&&err.ValueKind==JsonValueKind.Object&&err.TryGetProperty("message",out var nested)?nested.GetString():"Gemini connection failed.";Error(message??"Gemini connection failed.");}return;}
+        if(e.TryGetProperty("type",out var eventType)){var type=eventType.GetString();if(type=="app.connected"){Status("Gemini Live · Listening");if(frame.Length>0&&source.Length>0)session.SendFrame(frame);if(orb!=null){orb.Active=true;orb.Invalidate();}}else if(type is "app.status" or "app.reconnecting"&&e.TryGetProperty("message",out var statusMessage))Status(statusMessage.GetString()??"");else if(type=="app.error"){StopLive();var message=e.TryGetProperty("message",out var msg)?msg.GetString():e.TryGetProperty("error",out var err)&&err.ValueKind==JsonValueKind.Object&&err.TryGetProperty("message",out var nested)?nested.GetString():"Gemini connection failed.";Error(message??"Gemini connection failed.");}return;}
         if(e.TryGetProperty("serverContent",out var content)){
             if(content.TryGetProperty("inputTranscription",out var input)&&input.TryGetProperty("text",out var inputText)){if(liveReply.Length>0)FlushLive();liveUser+=inputText.GetString()??"";}
             if(content.TryGetProperty("outputTranscription",out var output)&&output.TryGetProperty("text",out var outputText))liveReply+=outputText.GetString()??"";
@@ -271,6 +277,8 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
                 if(!brain.Enabled("documents"))throw new InvalidOperationException("Document tools are disabled.");
                 if(!args.TryGetProperty("page",out var selectedPage)||!selectedPage.TryGetInt32(out var number))throw new InvalidOperationException("Specify a PDF page number.");
                 response=await SharePdfPage(number);
+            }else if(name=="local_search"){
+                var query=args.TryGetProperty("query",out var q)?q.GetString()??"":"";response=new{results=LocalKnowledge.Search(brain,query)};
             }else if(name=="device_action"){
                 if(!brain.Enabled("device"))throw new InvalidOperationException("Device controls are disabled.");
                 var action=args.TryGetProperty("action",out var a)?a.GetString()??"":"";var value=args.TryGetProperty("value",out var v)?v.GetString()??"":"";
@@ -293,17 +301,18 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
     }
     void FlushLive(){if(liveUser.Length>0||liveReply.Length>0){brain.Record(new Turn{You=liveUser,Reply=liveReply,Mode="Live"});Save();}liveUser=liveReply="";}
     void ToggleCamera(){if(source=="camera"){StopVision();Render();return;}if(brain.LocalMode||offlineVoice){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");return;}Permission(Manifest.Permission.Camera,()=>{StopVision();camera=new CameraFrames(this,f=>OnFrame("camera",f));source="camera";tab="Home";Render();});}
-    void ToggleScreen(){if(source=="screen"){StopVision();Render();return;}if(brain.LocalMode||offlineVoice){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");return;}Permission(Manifest.Permission.RecordAudio,()=>{var manager=(MediaProjectionManager)GetSystemService(MediaProjectionService)!;StartActivityForResult(manager.CreateScreenCaptureIntent(),100);});}
+    void ToggleScreen(){if(source=="screen"){StopVision();Render();return;}if(brain.LocalMode||offlineVoice){Error("Offline voice supports text and local commands. Use Gemini Live or device voice for visual reading.");return;}Permission(Manifest.Permission.RecordAudio,()=>{var manager=(MediaProjectionManager)GetSystemService(MediaProjectionService)!;StartActivityForResult(OperatingSystem.IsAndroidVersionAtLeast(34)?manager.CreateScreenCaptureIntent(MediaProjectionConfig.CreateConfigForDefaultDisplay()):manager.CreateScreenCaptureIntent(),100);});}
     void StopVision(){camera?.Close();camera=null;StopService(new Intent(this,typeof(CaptureService)));source=frame="";}
     void OnFrame(string kind,string value){if(kind!=source||disposed)return;frame=value;live?.SendFrame(value);}
-    void OnCaptureEnded()=>RunOnUiThread(()=>{if(source=="screen"){source=frame="";Status("Screen sharing ended.");}});
+    void OnCaptureFailed(string message)=>RunOnUiThread(()=>{Status(message);if(foreground)Error(message);});
+    void OnCaptureEnded()=>RunOnUiThread(()=>{if(source=="screen"){source=frame="";Status("Screen sharing ended. Android requires fresh approval to start again.");}});
     void Pick(int code){var i=new Intent(Intent.ActionOpenDocument);i.AddCategory(Intent.CategoryOpenable);i.SetType(code==102?"application/json":"*/*");StartActivityForResult(i,code);}
     void Export(){var i=new Intent(Intent.ActionCreateDocument);i.AddCategory(Intent.CategoryOpenable);i.SetType("application/json");i.PutExtra(Intent.ExtraTitle,"aura-backup-"+DateTime.Now.ToString("yyyy-MM-dd")+".json");StartActivityForResult(i,101);}
     protected override async void OnActivityResult(int code,Result result,Intent? data)
     {
         base.OnActivityResult(code,result,data);if(result!=Result.Ok||data==null)return;
         try{
-            if(code==100){StopVision();source="screen";var i=new Intent(this,typeof(CaptureService));i.PutExtra("result",(int)result);i.PutExtra("data",data);StartForegroundService(i);tab="Home";Render();}
+            if(code==100){brain.RequireCloud();var generation=CaptureService.NewSession();StopVision();source="screen";var i=new Intent(this,typeof(CaptureService));i.PutExtra("generation",generation);i.PutExtra("result",(int)result);i.PutExtra("data",data);StartForegroundService(i);tab="Home";Render();}
             else if(data.Data!=null&&code==101){using var output=ContentResolver!.OpenOutputStream(data.Data)!;await output.WriteAsync(System.Text.Encoding.UTF8.GetBytes(Brain.Export(brain)));Toast.MakeText(this,"Backup exported",ToastLength.Short)?.Show();}
             else if(data.Data!=null&&code==102){using var stream=ContentResolver!.OpenInputStream(data.Data)!;using var reader=new StreamReader(stream);var imported=Brain.Import(await reader.ReadToEndAsync());Confirm("Replace app data?","Export a backup first to keep your current data.",()=>{foreach(var r in brain.Reminders)ReminderReceiver.Cancel(this,r);brain=imported;Save();ReminderReceiver.Reschedule(this,brain);Voice();Render();});}
             else if(data.Data!=null&&code==104){if(!FileName(data.Data).EndsWith(".litertlm",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Choose a .litertlm model file.");using var model=ContentResolver!.OpenInputStream(data.Data)!;await NativeLocal.ImportModel(this,model,CancellationToken.None);Error("Offline language model imported.");}
@@ -312,7 +321,9 @@ public sealed partial class MainActivity : Activity, IRecognitionListener, TextT
     }
     protected override void OnResume(){base.OnResume();foreground=true;NativeLocal.Visible(true);if(brain!=null&&!brain.LocalMode&&brain.WakeWord&&!listen&&live==null){listen=CheckSelfPermission(Manifest.Permission.RecordAudio)==Android.Content.PM.Permission.Granted;awake=false;}ScheduleListen();}
     protected override void OnPause(){foreground=false;NativeLocal.Visible(false);if(offlineVoice)NativeLocal.Pause();recognizer?.Cancel();if(source=="camera"){camera?.Close();camera=null;source=frame="";}base.OnPause();}
-    protected override void OnDestroy(){disposed=true;localPolling=false;NativeLocal.Visible(false);asking?.Cancel();StopVoice();StopLive();StopVision();LiveService.StopRequested-=OnLiveStopRequested;ReminderReceiver.Delivered-=OnReminderDelivered;CaptureService.Frame-=OnFrame;CaptureService.Ended-=OnCaptureEnded;recognizer?.Destroy();tts?.Shutdown();base.OnDestroy();}
+    protected override void OnDestroy(){disposed=true;localPolling=false;NativeLocal.Visible(false);asking?.Cancel();StopVoice();StopLive();StopVision();LiveService.StopRequested-=OnLiveStopRequested;ReminderReceiver.Delivered-=OnReminderDelivered;CaptureService.Frame-=OnFrame; CaptureService.Failed-=OnCaptureFailed;CaptureService.Ended-=OnCaptureEnded;recognizer?.Destroy();tts?.Shutdown();base.OnDestroy();}
 }
+
+
 
 

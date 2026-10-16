@@ -11,6 +11,8 @@ public static class ProtocolChecks
     public static async Task Run(Action<bool,string> check)
     {
         check(!new Brain().UseRelay,"public relay is off by default");
+        check(GeminiFailure.Code("RESOURCE_EXHAUSTED: quota exceeded")=="quota"&&GeminiFailure.Code("HTTP 429")=="quota","provider quota errors are classified without claiming unlimited access");
+        check(GeminiFailure.Code("HTTP 403")=="authorization"&&GeminiFailure.Code("network interrupted")=="connection","authorization and transient network failures are distinguished");
         int blockedRequests=0;using(var blockedHttp=new HttpClient(new FakeHttp(_=>{blockedRequests++;return Task.FromResult(Ok("{}"));}))){bool blocked=false;try{await DirectGeminiClient.Ask(new Brain(),"hello",null,"unused",(_,_)=>throw new Exception("Must not execute"),CancellationToken.None,blockedHttp);}catch(InvalidOperationException){blocked=true;}check(blocked&&blockedRequests==0,"local mode prevents a real HTTP client from making a cloud request");}
         var ledger=new ToolCallLedger();
         check(ledger.Begin("one")&&!ledger.Begin("one"),"duplicate tool call is executed once");
@@ -39,6 +41,21 @@ public static class ProtocolChecks
                 check(setup.RootElement.GetProperty("setup").GetProperty("sessionResumption").GetProperty("handle").GetString()=="resume-test","reconnect sends the session handle");
             second.Push("""{"setupComplete":{}}""");await Until(()=>connection.Connected);
             check(opens==2,"resumed connection waits for new setup");
+        }
+        var cycles=Enumerable.Range(0,5).Select(_=>new FakeSocket()).ToArray();opens=0;
+        using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",_=>{},(_,_,_)=>Task.FromResult<WebSocket>(cycles[Interlocked.Increment(ref opens)-1]),TimeSpan.FromMilliseconds(500)))
+        {
+            var start=connection.Start();await Until(()=>cycles[0].Sent.Count>0);cycles[0].Push("""{"setupComplete":{}}""");await start;
+            cycles[0].Push("""{"sessionResumptionUpdate":{"resumable":true,"newHandle":"long-session"}}""");
+            for(int n=0;n<4;n++){cycles[n].PushClose();await Until(()=>cycles[n+1].Sent.Count>0);cycles[n+1].Push("""{"setupComplete":{}}""");await Until(()=>connection.Connected);}
+            check(opens==5&&connection.Connected,"successful renewal resets the consecutive retry budget for long sessions");
+        }
+        var quotaSocket=new FakeSocket{CloseReason="You exceeded your current quota"};opens=0;string quotaCode="";
+        using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")quotaCode=e.GetProperty("code").GetString()!;},(_,_,_)=>{opens++;return Task.FromResult<WebSocket>(quotaSocket);},TimeSpan.FromMilliseconds(500)))
+        {
+            var start=connection.Start();await Until(()=>quotaSocket.Sent.Count>0);quotaSocket.Push("""{"setupComplete":{}}""");await start;
+            quotaSocket.Push("""{"sessionResumptionUpdate":{"resumable":true,"newHandle":"quota-session"}}""");quotaSocket.PushClose();await Until(()=>quotaCode.Length>0);
+            check(opens==1&&quotaCode=="quota","quota rejection stops without reconnect loops or provider substitution");
         }
         var silent=new FakeSocket();string failure="";
         using(var connection=new GeminiConnection(new Brain{LocalMode=false},"test-key",e=>{if(e.TryGetProperty("type",out var t)&&t.GetString()=="app.error")failure=e.GetProperty("message").GetString()!;},
@@ -102,7 +119,8 @@ sealed class FakeSocket:WebSocket
     public void Push(string json)=>incoming.Writer.TryWrite(json);
     public void PushClose()=>incoming.Writer.TryWrite(null);
     public override WebSocketCloseStatus? CloseStatus=>WebSocketCloseStatus.NormalClosure;
-    public override string? CloseStatusDescription=>"test close";
+    public string CloseReason="test close";
+    public override string? CloseStatusDescription=>CloseReason;
     public override WebSocketState State=>state;
     public override string? SubProtocol=>null;
     public override void Abort(){state=WebSocketState.Aborted;incoming.Writer.TryComplete();}

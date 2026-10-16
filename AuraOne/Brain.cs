@@ -34,7 +34,7 @@ public sealed class Brain
     public List<Skill> Skills { get; set; } = [];
     public List<string> Roles { get; set; } = [];
     public List<Turn> History { get; set; } = [];
-    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["documents"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
+    public Dictionary<string, bool> Tools { get; set; } = new() { ["weather"] = true, ["time"] = true, ["web"] = true, ["wikipedia"] = true, ["calculator"] = true, ["notes"] = true, ["reminders"] = true, ["memory"] = true, ["skills"] = true, ["phone"] = true, ["device"] = true, ["documents"] = true, ["history"] = true, ["gmail"] = false, ["calendar"] = false, ["drive"] = false, ["github"] = false };
     public bool Enabled(string tool) => Tools.TryGetValue(tool, out var enabled) && enabled;
     public string[] EnabledTools() => Tools.Where(x => x.Value).Select(x => x.Key).ToArray();
     public void RequireCloud(){if(LocalMode)throw new InvalidOperationException("Online AI is off. On-device mode uses no API key or cloud credits. Enable optional online AI in Settings to use this feature.");}
@@ -125,3 +125,4 @@ public sealed class BrainStore(string directory)
     public Brain Load() { try { return File.Exists(file) ? Brain.Import(File.ReadAllText(file)) : new(); } catch { if(File.Exists(file))File.Copy(file,file+".unreadable-"+DateTime.UtcNow.Ticks+".json",true);return new(); } }
     public void Save(Brain brain) { Directory.CreateDirectory(Path.GetDirectoryName(file)!); var tmp = file + ".tmp"; File.WriteAllText(tmp, Brain.Export(brain)); File.Move(tmp, file, true); }
 }
+

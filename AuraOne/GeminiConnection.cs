@@ -64,7 +64,7 @@ public sealed class GeminiConnection : IDisposable
                     if(ErrorMessage(e) is {} error)throw new Rejected(error);
                     if(e.TryGetProperty("setupComplete",out _)||(e.TryGetProperty("type",out var t)&&t.GetString()=="app.ready"))
                     {
-                        established=true;connected=true;deadline.CancelAfter(Timeout.InfiniteTimeSpan);ready.TrySetResult();
+                        established=true;connected=true;retries=0;deadline.CancelAfter(Timeout.InfiniteTimeSpan);ready.TrySetResult();
                         Emit(new{type="app.connected"});
                     }
                     if(e.TryGetProperty("sessionResumptionUpdate",out var update))
@@ -88,15 +88,17 @@ public sealed class GeminiConnection : IDisposable
                 var message=error is OperationCanceledException
                     ?(established?"Gemini connection timed out.":"Gemini did not complete connection setup before the timeout. Check your key, model access and internet connection.")
                     :error.Message;
-                if(ready.Task.IsCompletedSuccessfully&&resumable&&resumeHandle.Length>0&&retries<3&&error is not Rejected)
+                var failureCode=GeminiFailure.Code(message);
+                if(ready.Task.IsCompletedSuccessfully&&resumable&&resumeHandle.Length>0&&retries<3&&error is not Rejected&&failureCode=="connection")
                 {
-                    retries++;Emit(new{type="app.reconnecting",message=$"Reconnecting Gemini voice ({retries}/3)Ã¢â‚¬Â¦"});
+                    retries++;Emit(new{type="app.reconnecting",message=$"Reconnecting Gemini voice ({retries}/3)…"});
                     try{await Task.Delay(750*retries,life.Token);}catch(OperationCanceledException){break;}
                     continue;
                 }
                 message=SafeMessage(message);
+                message=GeminiFailure.Explain(message,brain.UseRelay);
                 ready.TrySetException(new InvalidOperationException(message));
-                Emit(new{type="app.error",message});
+                Emit(new{type="app.error",message,code=failureCode});
                 Dispose();break;
             }
             finally
@@ -150,6 +152,24 @@ public sealed class GeminiConnection : IDisposable
         try{socket?.Abort();}catch{}
     }
     sealed class Rejected(string message):Exception(message);
+}
+public static class GeminiFailure
+{
+    public static string Code(string message)
+    {
+        var m=message.ToLowerInvariant();
+        if(m.Contains("quota")||m.Contains("resource_exhausted")||m.Contains("rate limit")||m.Contains("too many requests")||m.Contains("not enough credits")||System.Text.RegularExpressions.Regex.IsMatch(m,@"\b429\b"))return "quota";
+        if(m.Contains("unauthenticated")||m.Contains("permission_denied")||m.Contains("api key not valid")||m.Contains("invalid key")||System.Text.RegularExpressions.Regex.IsMatch(m,@"\b(?:401|403)\b"))return "authorization";
+        return "connection";
+    }
+    public static string Explain(string message,bool relay)
+    {
+        var safe=message.Length>1400?message[..1400]:message;
+        return Code(message) switch{
+            "quota"=>(relay?"The relay rejected this session for quota or credits.":"Google rejected Gemini Live for quota or rate limits.")+" The app cannot remove provider limits. Gemini stays selected; no other AI is substituted.\n\nProvider: "+safe,
+            "authorization"=>"Gemini authorization or model access was rejected. Check the saved key and its Google project permissions.\n\nProvider: "+safe,
+            _=>safe};
+    }
 }
 public sealed class ToolCallLedger
 {
