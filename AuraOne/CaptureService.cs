@@ -36,11 +36,13 @@ public sealed class CaptureService:Service,ImageReader.IOnImageAvailableListener
             reader=NewReader(width,height);
             display=projection.CreateVirtualDisplay("AuraScreen",width,height,density,(Android.Views.DisplayFlags)(int)VirtualDisplayFlags.AutoMirror,reader.Surface,null,frames);
             Volatile.Write(ref activeGeneration,generation);
+            frames.Post(PumpFrame);
         }
         catch(Exception e){if(generation==Volatile.Read(ref currentGeneration))Failed?.Invoke("Screen sharing could not start ("+e.GetType().Name+"). Approve a new sharing session.");StopSelf();}
         return StartCommandResult.NotSticky;
     }
-    ImageReader NewReader(int w,int h){var next=ImageReader.NewInstance(w,h,(ImageFormatType)1,2);next.SetOnImageAvailableListener(this,frames);return next;}
+    ImageReader NewReader(int w,int h)=>ImageReader.NewInstance(w,h,(ImageFormatType)1,3);
+    void PumpFrame(){if(stopped||generation!=Volatile.Read(ref currentGeneration))return;OnImageAvailable(reader);frames?.PostDelayed(PumpFrame,1500);}
     sealed class ProjectionCallback(CaptureService owner,int id):MediaProjection.Callback
     {
         public override void OnStop(){if(owner.generation==id)owner.StopSelf();}
@@ -54,7 +56,10 @@ public sealed class CaptureService:Service,ImageReader.IOnImageAvailableListener
     }
     public void OnImageAvailable(ImageReader? source)
     {
-        try{using var image=source?.AcquireLatestImage();if(image==null||System.Environment.TickCount64-last<1500||stopped||generation!=Volatile.Read(ref currentGeneration))return;last=System.Environment.TickCount64;var plane=image.GetPlanes()![0];var buffer=plane.Buffer!;var pixel=plane.PixelStride;var paddedWidth=plane.RowStride/pixel;using var raw=Bitmap.CreateBitmap(paddedWidth,image.Height,Bitmap.Config.Argb8888!);raw.CopyPixelsFromBuffer(buffer);using var cropped=Bitmap.CreateBitmap(raw,0,0,image.Width,image.Height);var scale=Math.Min(1d,768d/Math.Max(cropped.Width,cropped.Height));using var resized=Bitmap.CreateScaledBitmap(cropped,(int)(cropped.Width*scale),(int)(cropped.Height*scale),true);using var output=new MemoryStream();resized.Compress(Bitmap.CompressFormat.Jpeg!,65,output);if(!stopped&&generation==Volatile.Read(ref currentGeneration)){Interlocked.Increment(ref capturedFrames);Frame?.Invoke("screen",Convert.ToBase64String(output.ToArray()));}}catch{/* Reader replacement or protected screens can invalidate one frame. */}
+        Android.Media.Image? image=null;
+        try{image=source?.AcquireLatestImage();if(image==null||stopped||generation!=Volatile.Read(ref currentGeneration))return;last=System.Environment.TickCount64;var plane=image.GetPlanes()![0];var buffer=plane.Buffer!;var pixel=plane.PixelStride;var paddedWidth=plane.RowStride/pixel;using var raw=Bitmap.CreateBitmap(paddedWidth,image.Height,Bitmap.Config.Argb8888!);raw.CopyPixelsFromBuffer(buffer);using var cropped=Bitmap.CreateBitmap(raw,0,0,image.Width,image.Height);var scale=Math.Min(1d,768d/Math.Max(cropped.Width,cropped.Height));using var resized=Bitmap.CreateScaledBitmap(cropped,(int)(cropped.Width*scale),(int)(cropped.Height*scale),true);using var output=new MemoryStream();resized.Compress(Bitmap.CompressFormat.Jpeg!,65,output);if(!stopped&&generation==Volatile.Read(ref currentGeneration)){Interlocked.Increment(ref capturedFrames);Frame?.Invoke("screen",Convert.ToBase64String(output.ToArray()));}}
+        catch{/* Reader replacement or protected screens can invalidate one frame. */}
+        finally{try{image?.Close();}catch{}image?.Dispose();}
     }
-    public override void OnDestroy(){stopped=true;Interlocked.CompareExchange(ref activeGeneration,0,generation);try{display?.Release();}catch{}try{reader?.Close();}catch{}try{projection?.Stop();}catch{}thread?.QuitSafely();if(generation==Volatile.Read(ref currentGeneration))Ended?.Invoke();base.OnDestroy();}
+    public override void OnDestroy(){stopped=true;frames?.RemoveCallbacksAndMessages(null);Interlocked.CompareExchange(ref activeGeneration,0,generation);try{display?.Release();}catch{}try{reader?.Close();}catch{}try{projection?.Stop();}catch{}thread?.QuitSafely();if(generation==Volatile.Read(ref currentGeneration))Ended?.Invoke();base.OnDestroy();}
 }
